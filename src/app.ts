@@ -1,17 +1,17 @@
-import { PropsWithChildren } from 'react'
+import { createElement, PropsWithChildren } from 'react'
 import { useLaunch } from '@tarojs/taro'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import './app.scss'
+
+const queryClient = new QueryClient()
 
 function App({ children }: PropsWithChildren<any>) {
   useLaunch(() => {
     console.log('App launched.')
   })
 
-  // children 是将要会渲染的页面
-  return children
+  return createElement(QueryClientProvider, { client: queryClient }, children)
 }
-  
-
 
 export default App
