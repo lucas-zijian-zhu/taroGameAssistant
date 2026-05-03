@@ -70,6 +70,20 @@ const getNextLeaderIndex = (leaderIndex: number, playerCount: number) => {
   return (leaderIndex + 1) % playerCount
 }
 
+const createDefaultPlayerName = (existingNames: string[]) => {
+  const existingNameSet = new Set(existingNames)
+
+  for (let index = 0; index < 100; index += 1) {
+    const name = `玩家${Math.floor(1000 + Math.random() * 9000)}`
+
+    if (!existingNameSet.has(name)) {
+      return name
+    }
+  }
+
+  return `玩家${Date.now()}`
+}
+
 const countVotes = <T extends string>(votes: Record<string, T>, value: T) => {
   return Object.values(votes).filter((vote) => vote === value).length
 }
@@ -213,15 +227,11 @@ export const useAvalonStore = create<AvalonState>((set, get) => ({
 
   joinRoom: () => {
     const state = get()
-    const name = state.playerName.trim()
+    const name = state.playerName.trim() || createDefaultPlayerName(state.players.map((player) => player.name))
     const code = state.roomCode || state.joinCode.trim().toUpperCase()
 
     if (!code) {
       return { ok: false, message: '请先创建或输入房间号' }
-    }
-
-    if (!name) {
-      return { ok: false, message: '请输入玩家昵称' }
     }
 
     if (state.phase !== 'lobby') {

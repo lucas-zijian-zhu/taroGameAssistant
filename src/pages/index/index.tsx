@@ -62,6 +62,20 @@ const getRoundStatusClassName = (status: string) => {
   return 'mission-fail neutral'
 }
 
+const createDefaultPlayerName = (existingNames: string[]) => {
+  const existingNameSet = new Set(existingNames)
+
+  for (let index = 0; index < 100; index += 1) {
+    const name = `玩家${Math.floor(1000 + Math.random() * 9000)}`
+
+    if (!existingNameSet.has(name)) {
+      return name
+    }
+  }
+
+  return `玩家${Date.now()}`
+}
+
 export default function Index () {
   const roomCode = useAvalonStore((state) => state.roomCode)
   const joinCode = useAvalonStore((state) => state.joinCode)
@@ -282,9 +296,9 @@ export default function Index () {
     }
 
     const code = targetRoomCode || roomCode || joinCode.trim().toUpperCase()
-    const name = playerName.trim()
+    const name = playerName.trim() || createDefaultPlayerName(players.map((player) => player.name))
 
-    if (!code || !name) {
+    if (!code) {
       showToast(localJoinRoom().message)
       return
     }

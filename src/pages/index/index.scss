@@ -164,12 +164,15 @@
 }
 
 .join-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 180px;
   align-items: center;
   margin-top: 22px;
 }
 
 .field {
-  flex: 1 1 0;
+  display: block;
+  width: 100%;
   min-width: 0;
   height: 76px;
   box-sizing: border-box;
@@ -559,7 +562,7 @@ button::after {
   background: #d8d2c8;
 }
 
-@media (width <= 420px) {
+@media (width <= 520px) {
   .avalon-page {
     padding: 24px 18px 42px;
   }
@@ -573,15 +576,19 @@ button::after {
   }
 
   .panel-head,
-  .join-box,
   .action-grid {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .join-box {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .room-code,
   .secondary-button,
   .deal-button {
+    width: 100%;
     flex-basis: auto;
   }
 
