@@ -133,6 +133,18 @@
   background: #111820;
 }
 
+.count-button-text {
+  color: #52606d;
+}
+
+.count-button.active .count-button-text {
+  color: #fff;
+}
+
+.count-button.button-disabled .count-button-text {
+  color: #8d98a3;
+}
+
 .action-grid {
   margin-top: 22px;
 }

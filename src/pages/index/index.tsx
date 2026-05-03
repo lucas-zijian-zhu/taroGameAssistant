@@ -556,7 +556,7 @@ export default function Index () {
                   disabled={isDisabled}
                   onClick={() => setPlayerCount(count)}
                 >
-                  {count}人
+                  <Text className='count-button-text'>{count}人</Text>
                 </Button>
               )
             })()
