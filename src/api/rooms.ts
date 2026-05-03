@@ -41,6 +41,8 @@ export type RemoteTeamVoteResult = {
   approveCount: number
   rejectCount: number
   passed: boolean
+  votes?: Record<string, TeamVote>
+  forced?: boolean
 }
 
 export type RemoteMissionResult = {

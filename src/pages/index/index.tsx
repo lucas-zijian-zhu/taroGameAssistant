@@ -62,6 +62,8 @@ const getRoundStatusClassName = (status: string) => {
   return 'mission-fail neutral'
 }
 
+const appVersion = process.env.TARO_APP_VERSION || '0.0.0'
+
 const createDefaultPlayerName = (existingNames: string[]) => {
   const existingNameSet = new Set(existingNames)
 
@@ -157,6 +159,10 @@ export default function Index () {
   const joinableRooms = useMemo(() => {
     return (roomsQuery.data?.rooms || []).filter((room) => room.status === 'lobby' && room.players.length < room.playerCount)
   }, [roomsQuery.data?.rooms])
+
+  const getPlayerName = useCallback((playerId: string) => {
+    return players.find((player) => player.id === playerId)?.name || playerId
+  }, [players])
 
   const showToast = useCallback((message?: string) => {
     if (message) {
@@ -896,20 +902,41 @@ export default function Index () {
             </View>
           </View>
           <View className='mission-list'>
-            {history.map((result, index) => (
-              <View key={`${result.round}-${index}`} className='mission-item'>
-                <Text className='mission-round'>第{result.round}轮</Text>
-                <Text className='mission-detail'>
-                  同意 {result.approveCount} / 反对 {result.rejectCount}
-                </Text>
-                <Text className={getRoundStatusClassName(result.status)}>
-                  {getRoundStatusText(result.status)}
-                </Text>
-              </View>
-            ))}
+            {history.map((result, index) => {
+              const approveVoters = Object.entries(result.teamVotes)
+                .filter(([, vote]) => vote === 'approve')
+                .map(([playerId]) => getPlayerName(playerId))
+              const rejectVoters = Object.entries(result.teamVotes)
+                .filter(([, vote]) => vote === 'reject')
+                .map(([playerId]) => getPlayerName(playerId))
+              const hasPublicTeamVotes = approveVoters.length > 0 || rejectVoters.length > 0
+
+              return (
+                <View key={`${result.round}-${index}`} className='mission-item history-item'>
+                  <View className='history-main'>
+                    <Text className='mission-round'>第{result.round}轮</Text>
+                    <Text className='mission-detail'>
+                      {result.teamVoteForced
+                        ? '第 5 次组队，强制出任务'
+                        : `同意 ${result.approveCount} / 反对 ${result.rejectCount}`}
+                    </Text>
+                    <Text className={getRoundStatusClassName(result.status)}>
+                      {getRoundStatusText(result.status)}
+                    </Text>
+                  </View>
+                  {hasPublicTeamVotes && (
+                    <View className='history-vote-detail'>
+                      <Text className='history-vote-text'>赞同：{approveVoters.join('、') || '-'}</Text>
+                      <Text className='history-vote-text'>反对：{rejectVoters.join('、') || '-'}</Text>
+                    </View>
+                  )}
+                </View>
+              )
+            })}
           </View>
         </View>
       )}
+      <Text className='app-version'>v{appVersion}</Text>
     </View>
   )
 }

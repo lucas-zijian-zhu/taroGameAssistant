@@ -33,7 +33,11 @@
     "dev:rn": "npm run build:rn -- --watch",
     "dev:qq": "npm run build:qq -- --watch",
     "dev:jd": "npm run build:jd -- --watch",
-    "dev:harmony-hybrid": "npm run build:harmony-hybrid -- --watch"
+    "dev:harmony-hybrid": "npm run build:harmony-hybrid -- --watch",
+    "build:weapp:local": "TARO_APP_ID=${TARO_APP_ID:-touristappid} TARO_APP_API_BASE_URL=http://localhost:3000/api TARO_APP_WS_BASE_URL=ws://localhost:3000/ws npm run build:weapp",
+    "build:weapp:remote": "TARO_APP_ID=${TARO_APP_ID:-touristappid} TARO_APP_API_BASE_URL=https://lucas-avalon-service.duckdns.org/api TARO_APP_WS_BASE_URL=wss://lucas-avalon-service.duckdns.org/ws npm run build:weapp",
+    "dev:weapp:local": "TARO_APP_ID=${TARO_APP_ID:-touristappid} TARO_APP_API_BASE_URL=http://localhost:3000/api TARO_APP_WS_BASE_URL=ws://localhost:3000/ws npm run build:weapp -- --watch",
+    "dev:weapp:remote": "TARO_APP_ID=${TARO_APP_ID:-touristappid} TARO_APP_API_BASE_URL=https://lucas-avalon-service.duckdns.org/api TARO_APP_WS_BASE_URL=wss://lucas-avalon-service.duckdns.org/ws npm run build:weapp -- --watch"
   },
   "browserslist": [
     "defaults and fully supports es6-module",

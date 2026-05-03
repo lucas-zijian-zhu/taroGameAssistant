@@ -139,16 +139,19 @@ const resolveMissionVote = (state: AvalonState): Partial<AvalonState> => {
   const successCount = countVotes(state.missionVotes, 'success')
   const failCount = countVotes(state.missionVotes, 'fail')
   const passed = failCount < mission.failsRequired
+  const status: RoundHistoryStatus = passed ? 'mission_succeeded' : 'mission_failed'
   const history = [
     ...state.history,
     {
       round: mission.round,
       teamPlayerIds: state.selectedTeamIds,
+      teamVotes: state.teamVotes,
+      teamVoteForced: false,
       approveCount,
       rejectCount,
       successCount,
       failCount,
-      status: passed ? 'mission_succeeded' : 'mission_failed',
+      status,
       missionCompleted: true,
       passed
     }
@@ -207,6 +210,8 @@ export const useAvalonStore = create<AvalonState>((set, get) => ({
         return {
           round: result.round,
           teamPlayerIds: result.teamPlayerIds,
+          teamVotes: result.teamVoteResult.votes || {},
+          teamVoteForced: Boolean(result.teamVoteResult.forced),
           approveCount: result.teamVoteResult.approveCount,
           rejectCount: result.teamVoteResult.rejectCount,
           successCount: result.missionResult?.successCount || 0,

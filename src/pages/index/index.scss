@@ -571,6 +571,41 @@
   color: #52606d;
 }
 
+.history-item {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.history-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.history-vote-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding-top: 4px;
+}
+
+.history-vote-text {
+  color: #52606d;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.app-version {
+  display: block;
+  margin-top: 24px;
+  color: #8d98a3;
+  font-size: 22px;
+  line-height: 1.3;
+  text-align: center;
+}
+
 button::after {
   border: 0;
 }

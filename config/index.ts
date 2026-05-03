@@ -1,11 +1,12 @@
 import { defineConfig, type UserConfigExport } from '@tarojs/cli'
 import path from 'node:path'
+import packageInfo from '../package.json'
 
 import devConfig from './dev'
 import prodConfig from './prod'
 
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
-export default defineConfig<'vite'>(async (merge, { command, mode }) => {
+export default defineConfig<'vite'>(async (merge, { command: _command, mode: _mode }) => {
   const baseConfig: UserConfigExport<'vite'> = {
     projectName: 'taroGameAssistant',
     date: '2026-4-25',
@@ -22,6 +23,7 @@ export default defineConfig<'vite'>(async (merge, { command, mode }) => {
       "@tarojs/plugin-generator"
     ],
     defineConstants: {
+      'process.env.TARO_APP_VERSION': JSON.stringify(packageInfo.version)
     },
     copy: {
       patterns: [
