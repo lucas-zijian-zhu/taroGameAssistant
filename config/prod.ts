@@ -1,6 +1,10 @@
 import type { UserConfigExport } from "@tarojs/cli"
 
 export default {
+  defineConstants: {
+    'process.env.TARO_APP_API_BASE_URL': JSON.stringify(process.env.TARO_APP_API_BASE_URL || 'https://lucas-avalon-service.duckdns.org/api'),
+    'process.env.TARO_APP_WS_BASE_URL': JSON.stringify(process.env.TARO_APP_WS_BASE_URL || 'wss://lucas-avalon-service.duckdns.org/ws')
+  },
   mini: {},
   h5: {
     /**
