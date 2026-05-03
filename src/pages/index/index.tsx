@@ -635,74 +635,76 @@ export default function Index () {
         </View>
       </View>
 
-      <View className='panel'>
-        <View className='panel-head'>
-          <View>
-            <Text className='panel-title'>玩家</Text>
-            <Text className='panel-desc'>{players.length}/{playerCount} 已加入，{readyPlayerCount}/{players.length || playerCount} 已准备</Text>
+      {hasJoinedRoom && (
+        <View className='panel'>
+          <View className='panel-head'>
+            <View>
+              <Text className='panel-title'>玩家</Text>
+              <Text className='panel-desc'>{players.length}/{playerCount} 已加入，{readyPlayerCount}/{players.length || playerCount} 已准备</Text>
+            </View>
+            {isCurrentPlayerHost && (
+              <Button className={getButtonClassName('deal-button', !canStartGame)} disabled={!canStartGame} loading={startGameMutation.isPending} onClick={handleStartGame}>
+                开始
+              </Button>
+            )}
           </View>
-          {isCurrentPlayerHost && (
-            <Button className={getButtonClassName('deal-button', !canStartGame)} disabled={!canStartGame} loading={startGameMutation.isPending} onClick={handleStartGame}>
-              开始
-            </Button>
-          )}
-        </View>
 
-        <View className='player-list'>
-          {players.length === 0 && (
-            <Text className='empty-text'>等待玩家加入</Text>
-          )}
+          <View className='player-list'>
+            {players.length === 0 && (
+              <Text className='empty-text'>等待玩家加入</Text>
+            )}
 
-          {players.map((player, index) => {
-            const isLeader = leader?.id === player.id && hasGameStarted
-            const isSelected = selectedTeamIds.includes(player.id)
+            {players.map((player, index) => {
+              const isLeader = leader?.id === player.id && hasGameStarted
+              const isSelected = selectedTeamIds.includes(player.id)
 
-            return (
-              <View key={player.id} className={isSelected ? 'player-row selected' : 'player-row'}>
-                <View className='player-main'>
-                  <Text className='seat'>#{index + 1}</Text>
-                  <Text className='player-name'>{player.name}</Text>
-                  {isLeader && <Text className='tag'>队长</Text>}
-                  {player.isHost && <Text className='tag'>房主</Text>}
-                  {canEditLobby && player.isReady && <Text className='tag ready'>已准备</Text>}
+              return (
+                <View key={player.id} className={isSelected ? 'player-row selected' : 'player-row'}>
+                  <View className='player-main'>
+                    <Text className='seat'>#{index + 1}</Text>
+                    <Text className='player-name'>{player.name}</Text>
+                    {isLeader && <Text className='tag'>队长</Text>}
+                    {player.isHost && <Text className='tag'>房主</Text>}
+                    {canEditLobby && player.isReady && <Text className='tag ready'>已准备</Text>}
+                  </View>
+                  <View className='player-actions'>
+                    {canEditLobby && isCurrentPlayerHost && player.id !== currentPlayerId && (
+                      <Button className='text-button' loading={leaveRoomMutation.isPending} onClick={() => handleLeaveRoom(player.id)}>
+                        移除
+                      </Button>
+                    )}
+                    {player.id === currentPlayerId && !player.isHost && (
+                      <Button className='text-button' loading={leaveRoomMutation.isPending} onClick={() => handleLeaveRoom(player.id)}>
+                        退出
+                      </Button>
+                    )}
+                    {player.id === currentPlayerId && player.isHost && (
+                      <Button className='text-button' loading={closeRoomMutation.isPending} onClick={handleDissolveRoom}>
+                        解散
+                      </Button>
+                    )}
+                    {canEditLobby && player.id === currentPlayerId && !player.isHost && (
+                      <Button className='text-button' loading={readyMutation.isPending} onClick={() => handleReady(player.id, !player.isReady)}>
+                        {player.isReady ? '取消' : '准备'}
+                      </Button>
+                    )}
+                    {canBuildTeam && (
+                      <Button className='text-button' onClick={() => toggleTeamMember(player.id)}>
+                        {isSelected ? '取消' : '选中'}
+                      </Button>
+                    )}
+                    {hasGameStarted && player.id === currentPlayerId && (
+                      <Button className='text-button' onClick={() => setActivePlayer(player.id)}>
+                        看我的身份
+                      </Button>
+                    )}
+                  </View>
                 </View>
-                <View className='player-actions'>
-                  {canEditLobby && isCurrentPlayerHost && player.id !== currentPlayerId && (
-                    <Button className='text-button' loading={leaveRoomMutation.isPending} onClick={() => handleLeaveRoom(player.id)}>
-                      移除
-                    </Button>
-                  )}
-                  {player.id === currentPlayerId && !player.isHost && (
-                    <Button className='text-button' loading={leaveRoomMutation.isPending} onClick={() => handleLeaveRoom(player.id)}>
-                      退出
-                    </Button>
-                  )}
-                  {player.id === currentPlayerId && player.isHost && (
-                    <Button className='text-button' loading={closeRoomMutation.isPending} onClick={handleDissolveRoom}>
-                      解散
-                    </Button>
-                  )}
-                  {canEditLobby && player.id === currentPlayerId && !player.isHost && (
-                    <Button className='text-button' loading={readyMutation.isPending} onClick={() => handleReady(player.id, !player.isReady)}>
-                      {player.isReady ? '取消' : '准备'}
-                    </Button>
-                  )}
-                  {canBuildTeam && (
-                    <Button className='text-button' onClick={() => toggleTeamMember(player.id)}>
-                      {isSelected ? '取消' : '选中'}
-                    </Button>
-                  )}
-                  {hasGameStarted && player.id === currentPlayerId && (
-                    <Button className='text-button' onClick={() => setActivePlayer(player.id)}>
-                      看我的身份
-                    </Button>
-                  )}
-                </View>
-              </View>
-            )
-          })}
+              )
+            })}
+          </View>
         </View>
-      </View>
+      )}
 
       {hasGameStarted && (
         <View className='panel'>
@@ -744,44 +746,60 @@ export default function Index () {
           )}
 
           {phase === 'team_vote' && (
-            <View className='vote-list'>
-              {players.map((player) => (
-                <View key={player.id} className='vote-row'>
-                  <Text className='player-name'>{player.name}</Text>
-                  {player.id === currentPlayerId && (
-                    <View className='vote-actions'>
-                      <Button className={getButtonClassName('small-button approve', !canVoteForTeam)} disabled={!canVoteForTeam} loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'approve')}>
-                        同意
-                      </Button>
-                      <Button className={getButtonClassName('small-button reject', !canVoteForTeam)} disabled={!canVoteForTeam} loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'reject')}>
-                        反对
-                      </Button>
-                    </View>
-                  )}
-                  <Text className='vote-state'>{teamVotes[player.id] ? '已投' : '待投'}</Text>
-                </View>
-              ))}
+            <View className='phase-box'>
+              <Text className='phase-text'>本次出任务队伍</Text>
+              <View className='team-chip-list'>
+                {players.filter((player) => selectedTeamIds.includes(player.id)).map((player) => (
+                  <Text key={player.id} className='team-chip'>{player.name}</Text>
+                ))}
+              </View>
+              <View className='vote-list'>
+                {players.map((player) => (
+                  <View key={player.id} className='vote-row'>
+                    <Text className='player-name'>{player.name}</Text>
+                    {player.id === currentPlayerId && (
+                      <View className='vote-actions'>
+                        <Button className={getButtonClassName('small-button approve', !canVoteForTeam)} disabled={!canVoteForTeam} loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'approve')}>
+                          同意
+                        </Button>
+                        <Button className={getButtonClassName('small-button reject', !canVoteForTeam)} disabled={!canVoteForTeam} loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'reject')}>
+                          反对
+                        </Button>
+                      </View>
+                    )}
+                    <Text className='vote-state'>{teamVotes[player.id] ? '已投' : '待投'}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           )}
 
           {phase === 'mission_vote' && (
-            <View className='vote-list'>
-              {players.filter((player) => selectedTeamIds.includes(player.id)).map((player) => (
-                <View key={player.id} className='vote-row'>
-                  <Text className='player-name'>{player.name}</Text>
-                  {player.id === currentPlayerId && (
-                    <View className='vote-actions'>
-                      <Button className={getButtonClassName('small-button approve', !canVoteForMission)} disabled={!canVoteForMission} loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'success')}>
-                        成功
-                      </Button>
-                      <Button className={getButtonClassName('small-button reject', !canVoteForMission)} disabled={!canVoteForMission} loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'fail')}>
-                        失败
-                      </Button>
-                    </View>
-                  )}
-                  <Text className='vote-state'>{missionVotes[player.id] ? '已投' : '待投'}</Text>
-                </View>
-              ))}
+            <View className='phase-box'>
+              <Text className='phase-text'>出任务队伍</Text>
+              <View className='team-chip-list'>
+                {players.filter((player) => selectedTeamIds.includes(player.id)).map((player) => (
+                  <Text key={player.id} className='team-chip'>{player.name}</Text>
+                ))}
+              </View>
+              <View className='vote-list'>
+                {players.filter((player) => selectedTeamIds.includes(player.id)).map((player) => (
+                  <View key={player.id} className='vote-row'>
+                    <Text className='player-name'>{player.name}</Text>
+                    {player.id === currentPlayerId && (
+                      <View className='vote-actions'>
+                        <Button className={getButtonClassName('small-button approve', !canVoteForMission)} disabled={!canVoteForMission} loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'success')}>
+                          成功
+                        </Button>
+                        <Button className={getButtonClassName('small-button reject', !canVoteForMission)} disabled={!canVoteForMission} loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'fail')}>
+                          失败
+                        </Button>
+                      </View>
+                    )}
+                    <Text className='vote-state'>{missionVotes[player.id] ? '已投' : '待投'}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           )}
 

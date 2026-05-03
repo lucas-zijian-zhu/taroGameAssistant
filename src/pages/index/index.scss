@@ -398,6 +398,24 @@
   gap: 14px;
 }
 
+.team-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.team-chip {
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 2px solid #cce3dc;
+  border-radius: 8px;
+  color: #176b5c;
+  background: #e5f3ee;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
 .vote-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 72px;
