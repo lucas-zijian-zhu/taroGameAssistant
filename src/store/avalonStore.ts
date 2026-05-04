@@ -10,7 +10,7 @@ import {
   shuffleRoles,
   type TeamVote
 } from '@/domain/avalon'
-import type { RemoteGame, RemoteRoom, VisibleRoleInfo } from '@/api/rooms'
+import type { RemoteGame, RemoteRoom, VisibleRoleInfo, Winner } from '@/api/rooms'
 
 type AvalonState = {
   roomCode: string
@@ -28,6 +28,7 @@ type AvalonState = {
   teamVotes: Record<string, TeamVote>
   missionVotes: Record<string, MissionVote>
   history: RoundResult[]
+  winner: Winner
   setJoinCode: (joinCode: string) => void
   setPlayerName: (playerName: string) => void
   setPlayerCount: (playerCount: number) => void
@@ -63,7 +64,8 @@ const initialGameState = {
   selectedTeamIds: [],
   teamVotes: {},
   missionVotes: {},
-  history: []
+  history: [],
+  winner: null
 }
 
 const getNextLeaderIndex = (leaderIndex: number, playerCount: number) => {
@@ -161,7 +163,8 @@ const resolveMissionVote = (state: AvalonState): Partial<AvalonState> => {
 
   return {
     history,
-    phase: successRounds >= 3 ? 'assassination' : failedRounds >= 3 ? 'finished' : 'round_result'
+    phase: successRounds >= 3 ? 'assassination' : failedRounds >= 3 ? 'finished' : 'round_result',
+    winner: failedRounds >= 3 ? 'evil' : null
   }
 }
 
@@ -190,7 +193,20 @@ export const useAvalonStore = create<AvalonState>((set, get) => ({
       role: state.players.find((item) => item.id === player.id)?.role
     })),
     currentPlayerId: currentPlayerId || state.currentPlayerId,
-    phase: room.status === 'lobby' ? 'lobby' : state.phase
+    phase: room.status === 'lobby' ? 'lobby' : state.phase,
+    ...(room.status === 'lobby'
+      ? {
+          visibleRoleInfo: null,
+          activePlayerId: '',
+          roundIndex: 0,
+          leaderIndex: 0,
+          selectedTeamIds: [],
+          teamVotes: {},
+          missionVotes: {},
+          history: [],
+          winner: null
+        }
+      : {})
   })),
 
   syncRemoteGame: (game, visibleRoleInfo) => set((state) => {
@@ -204,6 +220,7 @@ export const useAvalonStore = create<AvalonState>((set, get) => ({
       teamVotes: progressToSubmittedMap(game.teamVoteProgress.players, 'approve'),
       missionVotes: progressToSubmittedMap(game.missionVoteProgress.players, 'success'),
       visibleRoleInfo: visibleRoleInfo === undefined ? state.visibleRoleInfo : visibleRoleInfo,
+      winner: game.winner,
       history: game.history.map((result) => {
         const status = getRoundHistoryStatus(result)
 
@@ -299,7 +316,8 @@ export const useAvalonStore = create<AvalonState>((set, get) => ({
       selectedTeamIds: [],
       teamVotes: {},
       missionVotes: {},
-      history: []
+      history: [],
+      winner: null
     })
 
     return { ok: true }

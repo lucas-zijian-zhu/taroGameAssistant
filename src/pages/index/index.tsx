@@ -12,6 +12,7 @@ import {
   useLeaveRoomMutation,
   useNextRoundMutation,
   useReadyMutation,
+  useResetGameMutation,
   useRoomsQuery,
   useStartGameMutation,
   useSubmitMissionVoteMutation,
@@ -94,6 +95,7 @@ export default function Index () {
   const teamVotes = useAvalonStore((state) => state.teamVotes)
   const missionVotes = useAvalonStore((state) => state.missionVotes)
   const history = useAvalonStore((state) => state.history)
+  const winner = useAvalonStore((state) => state.winner)
   const setJoinCode = useAvalonStore((state) => state.setJoinCode)
   const setPlayerName = useAvalonStore((state) => state.setPlayerName)
   const setPlayerCount = useAvalonStore((state) => state.setPlayerCount)
@@ -126,6 +128,7 @@ export default function Index () {
   const submitMissionVoteMutation = useSubmitMissionVoteMutation(roomCode)
   const nextRoundMutation = useNextRoundMutation(roomCode)
   const assassinateMutation = useAssassinateMutation(roomCode)
+  const resetGameMutation = useResetGameMutation(roomCode)
 
   const rolePreview = useMemo(() => getRolePreview(playerCount), [playerCount])
   const evilCount = useMemo(() => rolePreview.filter((role) => role.team === 'evil').length, [rolePreview])
@@ -156,6 +159,19 @@ export default function Index () {
   const activeRole = activePlayer?.role || (activePlayer?.id === currentPlayerId ? visibleRoleInfo?.myRole : undefined)
   const currentRole = currentPlayer?.role || visibleRoleInfo?.myRole
   const canAssassinate = phase === 'assassination' && currentRole?.id === 'assassin'
+  const resolvedWinner = winner || (failedRounds >= 3 ? 'evil' : null)
+  const isAssassinationFinished = phase === 'finished' && successRounds >= 3
+  const finalResultClassName = resolvedWinner === 'good' ? 'result-text good' : 'result-text evil'
+  const finalResultText = resolvedWinner === 'good'
+    ? '好人阵营获胜。'
+    : resolvedWinner === 'evil'
+      ? '坏人阵营获胜。'
+      : '对局结束，等待最终胜负同步。'
+  const assassinationResultText = isAssassinationFinished && resolvedWinner
+    ? resolvedWinner === 'evil'
+      ? '刺杀正确，刺客命中梅林。'
+      : '刺杀失败，梅林存活。'
+    : ''
   const joinableRooms = useMemo(() => {
     return (roomsQuery.data?.rooms || []).filter((room) => room.status === 'lobby' && room.players.length < room.playerCount)
   }, [roomsQuery.data?.rooms])
@@ -371,6 +387,19 @@ export default function Index () {
       return
     }
 
+    if (isSelf && hasGameStarted) {
+      const result = await Taro.showModal({
+        title: '确认退出',
+        content: '对局已经开始，退出后将离开当前房间。确定要退出吗？',
+        confirmText: '退出',
+        cancelText: '取消'
+      })
+
+      if (!result.confirm) {
+        return
+      }
+    }
+
     try {
       const data = await leaveRoomMutation.mutateAsync({
         playerId
@@ -521,6 +550,27 @@ export default function Index () {
     }
   }
 
+  const handleRestartGame = async () => {
+    if (!currentPlayerId) {
+      showToast('缺少当前玩家')
+      return
+    }
+
+    if (!isCurrentPlayerHost) {
+      showToast('只有房主可以重开对局')
+      return
+    }
+
+    try {
+      const data = await resetGameMutation.mutateAsync({
+        hostPlayerId: currentPlayerId
+      })
+      syncRemoteRoom(data.room)
+    } catch (error) {
+      showError(error)
+    }
+  }
+
   const handleReset = () => {
     clearPlayerSession()
     reset()
@@ -543,59 +593,64 @@ export default function Index () {
           <Text className='room-code'>{roomCode || '未创建'}</Text>
         </View>
 
-        <View className='toolbar'>
-          {PLAYER_COUNTS.map((count) => (
-            (() => {
-              const isDisabled = !canEditLobby || players.length > 0
-              const className = count === playerCount ? 'count-button active' : 'count-button'
+        {!hasGameStarted && (
+          <>
+            <View className='toolbar'>
+              {PLAYER_COUNTS.map((count) => (
+                (() => {
+                  const isDisabled = !canEditLobby || players.length > 0
+                  const className = count === playerCount ? 'count-button active' : 'count-button'
 
-              return (
-                <Button
-                  key={count}
-                  className={getButtonClassName(className, isDisabled)}
-                  disabled={isDisabled}
-                  onClick={() => setPlayerCount(count)}
-                >
-                  <Text className='count-button-text'>{count}人</Text>
-                </Button>
-              )
-            })()
-          ))}
-        </View>
+                  return (
+                    <Button
+                      key={count}
+                      className={getButtonClassName(className, isDisabled)}
+                      disabled={isDisabled}
+                      onClick={() => setPlayerCount(count)}
+                    >
+                      <Text className='count-button-text'>{count}人</Text>
+                    </Button>
+                  )
+                })()
+              ))}
+            </View>
 
-        <View className='action-grid'>
-          <Button className={getButtonClassName('primary-button', !canCreateRoom)} disabled={!canCreateRoom} loading={createRoomMutation.isPending} onClick={handleCreateRoom}>
-            创建房间
-          </Button>
-          <Button className='ghost-button' onClick={handleReset}>
-            重置
-          </Button>
-        </View>
+            <View className='action-grid'>
+              <Button className={getButtonClassName('primary-button', !canCreateRoom)} disabled={!canCreateRoom} loading={createRoomMutation.isPending} onClick={handleCreateRoom}>
+                创建房间
+              </Button>
+              <Button className='ghost-button' onClick={handleReset}>
+                重置
+              </Button>
+            </View>
 
-        <View className='join-box'>
-          <Input
-            className='field'
-            disabled={!canJoinRoom}
-            maxlength={8}
-            placeholder='房间号'
-            value={joinCode}
-            onInput={(event) => setJoinCode(String(event.detail.value).toUpperCase())}
-          />
-          <Input
-            className='field'
-            disabled={!canJoinRoom}
-            maxlength={12}
-            placeholder='玩家昵称'
-            value={playerName}
-            onInput={(event) => setPlayerName(String(event.detail.value))}
-          />
-          <Button className={getButtonClassName('secondary-button', !canJoinRoom)} disabled={!canJoinRoom} loading={joinRoomMutation.isPending} onClick={() => handleJoinRoom()}>
-            加入房间
-          </Button>
-        </View>
+            <View className='join-box'>
+              <Input
+                className='field'
+                disabled={!canJoinRoom}
+                maxlength={8}
+                placeholder='房间号'
+                value={joinCode}
+                onInput={(event) => setJoinCode(String(event.detail.value).toUpperCase())}
+              />
+              <Input
+                className='field'
+                disabled={!canJoinRoom}
+                maxlength={12}
+                placeholder='玩家昵称'
+                value={playerName}
+                onInput={(event) => setPlayerName(String(event.detail.value))}
+              />
+              <Button className={getButtonClassName('secondary-button', !canJoinRoom)} disabled={!canJoinRoom} loading={joinRoomMutation.isPending} onClick={() => handleJoinRoom()}>
+                加入房间
+              </Button>
+            </View>
+          </>
+        )}
       </View>
 
-      <View className='panel'>
+      {!hasGameStarted && (
+        <View className='panel'>
         <View className='panel-head'>
           <View>
             <Text className='panel-title'>当前大厅</Text>
@@ -639,7 +694,8 @@ export default function Index () {
             })()
           ))}
         </View>
-      </View>
+        </View>
+      )}
 
       {hasJoinedRoom && (
         <View className='panel'>
@@ -700,8 +756,8 @@ export default function Index () {
                       </Button>
                     )}
                     {hasGameStarted && player.id === currentPlayerId && (
-                      <Button className='text-button' onClick={() => setActivePlayer(player.id)}>
-                        看我的身份
+                      <Button className='text-button' onClick={() => setActivePlayer(activePlayerId === player.id ? '' : player.id)}>
+                        {activePlayerId === player.id ? '隐藏身份' : '看我的身份'}
                       </Button>
                     )}
                   </View>
@@ -709,6 +765,15 @@ export default function Index () {
               )
             })}
           </View>
+        </View>
+      )}
+
+      {hasGameStarted && activePlayer && activeRole && (
+        <View className={activeRole.team === 'good' ? 'role-card good' : 'role-card evil'}>
+          <Text className='role-owner'>{activePlayer.name} 的身份</Text>
+          <Text className='role-name'>{activeRole.name}</Text>
+          <Text className='role-team'>{activeRole.team === 'good' ? '好人阵营' : '坏人阵营'}</Text>
+          <Text className='role-desc'>{activeRole.description}</Text>
         </View>
       )}
 
@@ -842,56 +907,19 @@ export default function Index () {
 
           {phase === 'finished' && (
             <View className='phase-box'>
-              <Text className={successRounds >= 3 ? 'result-text good' : 'result-text evil'}>
-                {successRounds >= 3 ? '对局结束。' : '坏人阵营达成三次任务失败，坏人获胜。'}
-              </Text>
+              <Text className={finalResultClassName}>{finalResultText}</Text>
+              {assassinationResultText && (
+                <Text className={finalResultClassName}>{assassinationResultText}</Text>
+              )}
+              {isCurrentPlayerHost && (
+                <Button className='primary-button' loading={resetGameMutation.isPending} onClick={handleRestartGame}>
+                  重开对局
+                </Button>
+              )}
             </View>
           )}
         </View>
       )}
-
-      {hasGameStarted && activePlayer && activeRole && (
-        <View className={activeRole.team === 'good' ? 'role-card good' : 'role-card evil'}>
-          <Text className='role-owner'>{activePlayer.name} 的身份</Text>
-          <Text className='role-name'>{activeRole.name}</Text>
-          <Text className='role-team'>{activeRole.team === 'good' ? '好人阵营' : '坏人阵营'}</Text>
-          <Text className='role-desc'>{activeRole.description}</Text>
-        </View>
-      )}
-
-      <View className='panel'>
-        <View className='panel-head'>
-          <View>
-            <Text className='panel-title'>基础包配置</Text>
-            <Text className='panel-desc'>{playerCount - evilCount} 好人 / {evilCount} 坏人</Text>
-          </View>
-        </View>
-        <View className='role-grid'>
-          {rolePreview.map((role, index) => (
-            <View key={`${role.id}-${index}`} className={role.team === 'good' ? 'role-chip good' : 'role-chip evil'}>
-              <Text>{role.name}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View className='panel'>
-        <View className='panel-head'>
-          <View>
-            <Text className='panel-title'>任务人数</Text>
-            <Text className='panel-desc'>第 4 轮在 7 人及以上需要 2 张失败票。</Text>
-          </View>
-        </View>
-        <View className='mission-list'>
-          {MISSION_TABLE[playerCount].map((mission) => (
-            <View key={mission.round} className='mission-item'>
-              <Text className='mission-round'>第{mission.round}轮</Text>
-              <Text className='mission-detail'>{mission.teamSize}人出任务</Text>
-              <Text className='mission-fail'>{mission.failsRequired}败失败</Text>
-            </View>
-          ))}
-        </View>
-      </View>
 
       {history.length > 0 && (
         <View className='panel'>
@@ -936,6 +964,40 @@ export default function Index () {
           </View>
         </View>
       )}
+
+      <View className='panel'>
+        <View className='panel-head'>
+          <View>
+            <Text className='panel-title'>基础包配置</Text>
+            <Text className='panel-desc'>{playerCount - evilCount} 好人 / {evilCount} 坏人</Text>
+          </View>
+        </View>
+        <View className='role-grid'>
+          {rolePreview.map((role, index) => (
+            <View key={`${role.id}-${index}`} className={role.team === 'good' ? 'role-chip good' : 'role-chip evil'}>
+              <Text>{role.name}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View className='panel'>
+        <View className='panel-head'>
+          <View>
+            <Text className='panel-title'>任务人数</Text>
+            <Text className='panel-desc'>第 4 轮在 7 人及以上需要 2 张失败票。</Text>
+          </View>
+        </View>
+        <View className='mission-list'>
+          {MISSION_TABLE[playerCount].map((mission) => (
+            <View key={mission.round} className='mission-item'>
+              <Text className='mission-round'>第{mission.round}轮</Text>
+              <Text className='mission-detail'>{mission.teamSize}人出任务</Text>
+              <Text className='mission-fail'>{mission.failsRequired}败失败</Text>
+            </View>
+          ))}
+        </View>
+      </View>
       <Text className='app-version'>v{appVersion}</Text>
     </View>
   )
