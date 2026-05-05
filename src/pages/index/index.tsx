@@ -427,6 +427,17 @@ export default function Index () {
       return
     }
 
+    const result = await Taro.showModal({
+      title: '确认解散',
+      content: '解散后所有玩家都会离开当前房间。确定要解散吗？',
+      confirmText: '解散',
+      cancelText: '取消'
+    })
+
+    if (!result.confirm) {
+      return
+    }
+
     try {
       await closeRoomMutation.mutateAsync({
         hostPlayerId: currentPlayerId
@@ -750,14 +761,14 @@ export default function Index () {
                         {player.isReady ? '取消' : '准备'}
                       </Button>
                     )}
-                    {canBuildTeam && (
-                      <Button className='text-button' onClick={() => toggleTeamMember(player.id)}>
-                        {isSelected ? '取消' : '选中'}
-                      </Button>
-                    )}
                     {hasGameStarted && player.id === currentPlayerId && (
                       <Button className='text-button' onClick={() => setActivePlayer(activePlayerId === player.id ? '' : player.id)}>
                         {activePlayerId === player.id ? '隐藏身份' : '看我的身份'}
+                      </Button>
+                    )}
+                    {canBuildTeam && (
+                      <Button className='text-button' onClick={() => toggleTeamMember(player.id)}>
+                        {isSelected ? '取消' : '选中'}
                       </Button>
                     )}
                   </View>
@@ -797,9 +808,11 @@ export default function Index () {
               <Text className='phase-text'>
                 {phase === 'role_reveal' ? '请各自查看身份，确认后进入发言讨论。' : '线下讨论完成后，由队长选择出任务队伍。'}
               </Text>
-              <Button className='primary-button' loading={enterSpeechMutation.isPending} onClick={handleEnterSpeech}>
-                进入发言
-              </Button>
+              {phase === 'role_reveal' && (
+                <Button className='primary-button' loading={enterSpeechMutation.isPending} onClick={handleEnterSpeech}>
+                  进入发言
+                </Button>
+              )}
             </View>
           )}
 
@@ -828,12 +841,12 @@ export default function Index () {
                 {players.map((player) => (
                   <View key={player.id} className='vote-row'>
                     <Text className='player-name'>{player.name}</Text>
-                    {player.id === currentPlayerId && (
+                    {player.id === currentPlayerId && canVoteForTeam && (
                       <View className='vote-actions'>
-                        <Button className={getButtonClassName('small-button approve', !canVoteForTeam)} disabled={!canVoteForTeam} loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'approve')}>
+                        <Button className='small-button approve' loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'approve')}>
                           同意
                         </Button>
-                        <Button className={getButtonClassName('small-button reject', !canVoteForTeam)} disabled={!canVoteForTeam} loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'reject')}>
+                        <Button className='small-button reject' loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'reject')}>
                           反对
                         </Button>
                       </View>
@@ -857,12 +870,12 @@ export default function Index () {
                 {players.filter((player) => selectedTeamIds.includes(player.id)).map((player) => (
                   <View key={player.id} className='vote-row'>
                     <Text className='player-name'>{player.name}</Text>
-                    {player.id === currentPlayerId && (
+                    {player.id === currentPlayerId && canVoteForMission && (
                       <View className='vote-actions'>
-                        <Button className={getButtonClassName('small-button approve', !canVoteForMission)} disabled={!canVoteForMission} loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'success')}>
+                        <Button className='small-button approve' loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'success')}>
                           成功
                         </Button>
-                        <Button className={getButtonClassName('small-button reject', !canVoteForMission)} disabled={!canVoteForMission} loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'fail')}>
+                        <Button className='small-button reject' loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'fail')}>
                           失败
                         </Button>
                       </View>
