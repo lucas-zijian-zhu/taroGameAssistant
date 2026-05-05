@@ -1,7 +1,7 @@
 import { Button, Input, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useRoomSocket } from '@/api/roomSocket'
+import { useLobbySocket, useRoomSocket } from '@/api/roomSocket'
 import { getRoomState } from '@/api/rooms'
 import {
   useCloseRoomMutation,
@@ -21,7 +21,7 @@ import {
 } from '@/api/rooms.queries'
 import { getDefaultRoleConfig, getMission, getRolePreview, MISSION_TABLE, PLAYER_COUNTS } from '@/domain/avalon'
 import { useAvalonStore } from '@/store/avalonStore'
-import { clearPlayerSession, getPlayerSession, savePlayerSession } from '@/store/playerSession'
+import { clearPlayerSession, getLobbyPlayerId, getPlayerSession, savePlayerSession } from '@/store/playerSession'
 import './index.scss'
 
 const getPhaseText = (phase: string) => {
@@ -65,6 +65,7 @@ const getRoundStatusClassName = (status: string) => {
 
 const appVersion = process.env.TARO_APP_VERSION || '0.0.0'
 const cachedWechatNicknameKey = 'avalon:wechat-nickname'
+const wechatNicknameDeniedKey = 'avalon:wechat-nickname-denied'
 const canUseWechatProfile = process.env.TARO_ENV === 'weapp'
 
 const createDefaultPlayerName = (existingNames: string[]) => {
@@ -116,22 +117,6 @@ export default function Index () {
   const setVisibleRoleInfo = useAvalonStore((state) => state.setVisibleRoleInfo)
   const reset = useAvalonStore((state) => state.reset)
 
-  const createRoomMutation = useCreateRoomMutation()
-  const joinRoomMutation = useJoinRoomMutation()
-  const roomsQuery = useRoomsQuery()
-  const refetchRoomsRef = useRef(roomsQuery.refetch)
-  const closeRoomMutation = useCloseRoomMutation(roomCode)
-  const leaveRoomMutation = useLeaveRoomMutation(roomCode)
-  const readyMutation = useReadyMutation(roomCode)
-  const startGameMutation = useStartGameMutation(roomCode)
-  const enterSpeechMutation = useEnterSpeechMutation(roomCode)
-  const submitTeamMutation = useSubmitTeamMutation(roomCode)
-  const submitTeamVoteMutation = useSubmitTeamVoteMutation(roomCode)
-  const submitMissionVoteMutation = useSubmitMissionVoteMutation(roomCode)
-  const nextRoundMutation = useNextRoundMutation(roomCode)
-  const assassinateMutation = useAssassinateMutation(roomCode)
-  const resetGameMutation = useResetGameMutation(roomCode)
-
   const rolePreview = useMemo(() => getRolePreview(playerCount), [playerCount])
   const evilCount = useMemo(() => rolePreview.filter((role) => role.team === 'evil').length, [rolePreview])
   const activePlayer = players.find((player) => player.id === activePlayerId)
@@ -174,6 +159,23 @@ export default function Index () {
       ? '刺杀正确，刺客命中梅林。'
       : '刺杀失败，梅林存活。'
     : ''
+  const createRoomMutation = useCreateRoomMutation()
+  const joinRoomMutation = useJoinRoomMutation()
+  const roomsQuery = useRoomsQuery({ enabled: !hasJoinedRoom })
+  const refetchRoomsRef = useRef(roomsQuery.refetch)
+  const lobbyRoomsRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lobbyPlayerId = useMemo(() => getLobbyPlayerId(), [])
+  const closeRoomMutation = useCloseRoomMutation(roomCode)
+  const leaveRoomMutation = useLeaveRoomMutation(roomCode)
+  const readyMutation = useReadyMutation(roomCode)
+  const startGameMutation = useStartGameMutation(roomCode)
+  const enterSpeechMutation = useEnterSpeechMutation(roomCode)
+  const submitTeamMutation = useSubmitTeamMutation(roomCode)
+  const submitTeamVoteMutation = useSubmitTeamVoteMutation(roomCode)
+  const submitMissionVoteMutation = useSubmitMissionVoteMutation(roomCode)
+  const nextRoundMutation = useNextRoundMutation(roomCode)
+  const assassinateMutation = useAssassinateMutation(roomCode)
+  const resetGameMutation = useResetGameMutation(roomCode)
   const joinableRooms = useMemo(() => {
     return (roomsQuery.data?.rooms || []).filter((room) => room.status === 'lobby' && room.players.length < room.playerCount)
   }, [roomsQuery.data?.rooms])
@@ -191,6 +193,14 @@ export default function Index () {
   useEffect(() => {
     refetchRoomsRef.current = roomsQuery.refetch
   }, [roomsQuery.refetch])
+
+  useEffect(() => {
+    return () => {
+      if (lobbyRoomsRefetchTimerRef.current) {
+        clearTimeout(lobbyRoomsRefetchTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!canUseWechatProfile || playerName.trim()) {
@@ -218,7 +228,6 @@ export default function Index () {
     if (room.status === 'closed' || (currentPlayerId && !isStillInRoom)) {
       clearPlayerSession()
       reset()
-      refetchRoomsRef.current()
       showToast(room.status === 'closed' ? '房间已解散' : '你已离开房间')
       return
     }
@@ -232,7 +241,6 @@ export default function Index () {
     if (state.room.status === 'closed' || (currentPlayerId && !isStillInRoom)) {
       clearPlayerSession()
       reset()
-      refetchRoomsRef.current()
       showToast(state.room.status === 'closed' ? '房间已解散' : '你已离开房间')
       return
     }
@@ -249,9 +257,19 @@ export default function Index () {
   const handleRoomClosed = useCallback(() => {
     clearPlayerSession()
     reset()
-    refetchRoomsRef.current()
     showToast('房间已解散')
   }, [reset, showToast])
+
+  const handleLobbyRoomsChanged = useCallback(() => {
+    if (lobbyRoomsRefetchTimerRef.current) {
+      clearTimeout(lobbyRoomsRefetchTimerRef.current)
+    }
+
+    lobbyRoomsRefetchTimerRef.current = setTimeout(() => {
+      refetchRoomsRef.current()
+      lobbyRoomsRefetchTimerRef.current = null
+    }, 300)
+  }, [])
 
   useEffect(() => {
     const session = getPlayerSession()
@@ -293,6 +311,13 @@ export default function Index () {
     onError: showToast
   })
 
+  useLobbySocket({
+    playerId: lobbyPlayerId,
+    enabled: !hasJoinedRoom,
+    onRoomsChanged: handleLobbyRoomsChanged,
+    onError: showToast
+  })
+
   const showError = (error: unknown) => {
     const fallback = error instanceof Error ? error.message : '请求失败'
     const apiError = error as { data?: { message?: string } }
@@ -323,9 +348,12 @@ export default function Index () {
       }
 
       Taro.setStorageSync(cachedWechatNicknameKey, nickname)
+      Taro.removeStorageSync(wechatNicknameDeniedKey)
       setPlayerName(nickname)
       return nickname
     } catch (error) {
+      Taro.setStorageSync(wechatNicknameDeniedKey, true)
+
       if (showDeniedToast) {
         showToast('未授权微信昵称')
       }
@@ -352,10 +380,15 @@ export default function Index () {
       return cachedNickname
     }
 
+    if (Taro.getStorageSync<boolean>(wechatNicknameDeniedKey)) {
+      return ''
+    }
+
     return requestWechatNickname(false)
   }
 
   const handleUseWechatNickname = async () => {
+    Taro.removeStorageSync(wechatNicknameDeniedKey)
     await requestWechatNickname(true)
   }
 
@@ -673,65 +706,67 @@ export default function Index () {
           <Text className='room-code'>{roomCode || '未创建'}</Text>
         </View>
 
-        {!hasGameStarted && (
-          <>
-            <View className='toolbar'>
-              {PLAYER_COUNTS.map((count) => (
-                (() => {
-                  const isDisabled = !canEditLobby || players.length > 0
-                  const className = count === playerCount ? 'count-button active' : 'count-button'
+        {!hasJoinedRoom && (
+          <View className='toolbar'>
+            {PLAYER_COUNTS.map((count) => (
+              (() => {
+                const isDisabled = !canEditLobby || players.length > 0
+                const className = count === playerCount ? 'count-button active' : 'count-button'
 
-                  return (
-                    <Button
-                      key={count}
-                      className={getButtonClassName(className, isDisabled)}
-                      disabled={isDisabled}
-                      onClick={() => setPlayerCount(count)}
-                    >
-                      <Text className='count-button-text'>{count}人</Text>
-                    </Button>
-                  )
-                })()
-              ))}
-            </View>
+                return (
+                  <Button
+                    key={count}
+                    className={getButtonClassName(className, isDisabled)}
+                    disabled={isDisabled}
+                    onClick={() => setPlayerCount(count)}
+                  >
+                    <Text className='count-button-text'>{count}人</Text>
+                  </Button>
+                )
+              })()
+            ))}
+          </View>
+        )}
 
-            <View className='action-grid'>
-              <Button className={getButtonClassName('primary-button', !canCreateRoom)} disabled={!canCreateRoom} loading={createRoomMutation.isPending} onClick={handleCreateRoom}>
-                创建房间
+        {!hasJoinedRoom && (
+          <View className='action-grid'>
+            <Button className={getButtonClassName('primary-button', !canCreateRoom)} disabled={!canCreateRoom} loading={createRoomMutation.isPending} onClick={handleCreateRoom}>
+              创建房间
+            </Button>
+          </View>
+        )}
+
+        {!hasJoinedRoom && (
+          <View className={canUseWechatProfile ? 'join-box with-profile' : 'join-box'}>
+            <Input
+              className='field'
+              disabled={!canJoinRoom}
+              maxlength={8}
+              placeholder='房间号'
+              value={joinCode}
+              onInput={(event) => setJoinCode(String(event.detail.value).toUpperCase())}
+            />
+            <Input
+              className='field'
+              disabled={!canJoinRoom}
+              maxlength={12}
+              placeholder='玩家昵称'
+              value={playerName}
+              onInput={(event) => setPlayerName(String(event.detail.value))}
+            />
+            {canUseWechatProfile && (
+              <Button className={getButtonClassName('ghost-button profile-button', !canJoinRoom)} disabled={!canJoinRoom} onClick={handleUseWechatNickname}>
+                微信昵称
               </Button>
-            </View>
-
-            <View className={canUseWechatProfile ? 'join-box with-profile' : 'join-box'}>
-              <Input
-                className='field'
-                disabled={!canJoinRoom}
-                maxlength={8}
-                placeholder='房间号'
-                value={joinCode}
-                onInput={(event) => setJoinCode(String(event.detail.value).toUpperCase())}
-              />
-              <Input
-                className='field'
-                disabled={!canJoinRoom}
-                maxlength={12}
-                placeholder='玩家昵称'
-                value={playerName}
-                onInput={(event) => setPlayerName(String(event.detail.value))}
-              />
-              {canUseWechatProfile && (
-                <Button className={getButtonClassName('ghost-button profile-button', !canJoinRoom)} disabled={!canJoinRoom} onClick={handleUseWechatNickname}>
-                  微信昵称
-                </Button>
-              )}
-              <Button className={getButtonClassName('secondary-button', !canJoinRoom)} disabled={!canJoinRoom} loading={joinRoomMutation.isPending} onClick={() => handleJoinRoom()}>
-                加入房间
-              </Button>
-            </View>
-          </>
+            )}
+            <Button className={getButtonClassName('secondary-button', !canJoinRoom)} disabled={!canJoinRoom} loading={joinRoomMutation.isPending} onClick={() => handleJoinRoom()}>
+              加入房间
+            </Button>
+          </View>
         )}
       </View>
 
-      {!hasGameStarted && (
+      {!hasJoinedRoom && (
         <View className='panel'>
         <View className='panel-head'>
           <View>
@@ -783,8 +818,8 @@ export default function Index () {
         <View className='panel'>
           <View className='panel-head'>
             <View>
-              <Text className='panel-title'>玩家</Text>
-              <Text className='panel-desc'>{players.length}/{playerCount} 已加入，{readyPlayerCount}/{players.length || playerCount} 已准备</Text>
+              <Text className='panel-title'>房间</Text>
+              <Text className='panel-desc'>{roomCode}，{players.length}/{playerCount} 已加入，{readyPlayerCount}/{players.length || playerCount} 已准备</Text>
             </View>
             {isCurrentPlayerHost && (
               <Button className={getButtonClassName('deal-button', !canStartGame)} disabled={!canStartGame} loading={startGameMutation.isPending} onClick={handleStartGame}>

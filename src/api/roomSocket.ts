@@ -5,9 +5,14 @@ import { getRoomState, type RemoteGame, type RemoteRoom, type VisibleRoleInfo } 
 
 type RoomSocketPayloads = {
   'connection.ready': {
-    roomCode: string
+    scope?: 'lobby' | 'room'
+    roomCode?: string
     playerId: string
     serverTime: string
+  }
+  'lobby.rooms.changed': {
+    reason: string
+    roomCode?: string
   }
   'room.updated': {
     room: RemoteRoom
@@ -58,6 +63,10 @@ const buildSocketUrl = (roomCode: string, playerId: string) => {
   return `${WS_BASE_URL}/rooms/${roomCode}?playerId=${encodeURIComponent(playerId)}`
 }
 
+const buildLobbySocketUrl = (playerId: string) => {
+  return `${WS_BASE_URL}/lobby?playerId=${encodeURIComponent(playerId)}`
+}
+
 const parseSocketMessage = (data: unknown): RoomSocketMessage | null => {
   if (typeof data !== 'string') {
     return null
@@ -68,6 +77,118 @@ const parseSocketMessage = (data: unknown): RoomSocketMessage | null => {
   } catch {
     return null
   }
+}
+
+type UseLobbySocketOptions = {
+  playerId: string
+  enabled?: boolean
+  onRoomsChanged: () => void
+  onError?: (message: string) => void
+}
+
+export const useLobbySocket = ({
+  playerId,
+  enabled = true,
+  onRoomsChanged,
+  onError
+}: UseLobbySocketOptions) => {
+  useEffect(() => {
+    if (!enabled || !playerId) {
+      return undefined
+    }
+
+    let closed = false
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let reconnectAttempt = 0
+    let h5Socket: WebSocket | null = null
+    let taroSocket: Taro.SocketTask | null = null
+
+    const handleMessage = (data: unknown) => {
+      const message = parseSocketMessage(data)
+
+      if (!message) {
+        return
+      }
+
+      if (message.type === 'connection.ready') {
+        return
+      }
+
+      if (message.type === 'lobby.rooms.changed') {
+        onRoomsChanged()
+        return
+      }
+
+      if (message.type === 'error') {
+        onError?.((message.payload as RoomSocketPayloads['error']).message)
+      }
+    }
+
+    const handleConnectionError = () => {
+      console.warn('Lobby WebSocket connection failed, retrying...')
+    }
+
+    const scheduleReconnect = () => {
+      if (closed) {
+        return
+      }
+
+      const delay = RECONNECT_DELAYS[Math.min(reconnectAttempt, RECONNECT_DELAYS.length - 1)]
+      reconnectAttempt += 1
+      reconnectTimer = setTimeout(connect, delay)
+    }
+
+    const connect = () => {
+      const url = buildLobbySocketUrl(playerId)
+
+      if (isH5Runtime()) {
+        h5Socket = new WebSocket(url)
+        h5Socket.onopen = () => {
+          reconnectAttempt = 0
+        }
+        h5Socket.onmessage = (event) => handleMessage(event.data)
+        h5Socket.onerror = handleConnectionError
+        h5Socket.onclose = () => scheduleReconnect()
+        return
+      }
+
+      Taro.connectSocket({ url }).then((socket) => {
+        if (closed) {
+          socket.close({})
+          return
+        }
+
+        taroSocket = socket
+        taroSocket.onOpen(() => {
+          reconnectAttempt = 0
+        })
+        taroSocket.onMessage((event) => handleMessage(event.data))
+        taroSocket.onError(handleConnectionError)
+        taroSocket.onClose(() => scheduleReconnect())
+      }).catch(() => {
+        handleConnectionError()
+        scheduleReconnect()
+      })
+    }
+
+    connect()
+
+    return () => {
+      closed = true
+
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+      }
+
+      if (h5Socket) {
+        h5Socket.close()
+      }
+
+      if (taroSocket) {
+        taroSocket.close({})
+      }
+    }
+  }, [enabled, onError, onRoomsChanged, playerId])
 }
 
 export const useRoomSocket = ({

@@ -21,10 +21,11 @@ export const useRoomQuery = (roomCode: string) => {
   })
 }
 
-export const useRoomsQuery = () => {
+export const useRoomsQuery = (options: { enabled?: boolean } = {}) => {
   return useQuery({
     queryKey: roomKeys.rooms,
-    queryFn: roomsApi.listRooms
+    queryFn: roomsApi.listRooms,
+    enabled: options.enabled ?? true
   })
 }
 
@@ -59,7 +60,6 @@ export const useCreateRoomMutation = () => {
     mutationFn: roomsApi.createRoom,
     onSuccess: (data) => {
       queryClient.setQueryData(roomKeys.room(data.room.code), { room: data.room })
-      queryClient.invalidateQueries({ queryKey: roomKeys.rooms })
       queryClient.setQueryData(roomKeys.state(data.room.code, data.currentPlayerId), {
         room: data.room,
         game: null,
@@ -79,7 +79,6 @@ export const useJoinRoomMutation = () => {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(roomKeys.room(data.room.code), { room: data.room })
-      queryClient.invalidateQueries({ queryKey: roomKeys.rooms })
       invalidateRoom(queryClient, data.room.code)
     }
   })
@@ -118,7 +117,6 @@ export const useCloseRoomMutation = (roomCode: string) => {
   return useMutation({
     mutationFn: (payload: { hostPlayerId: string }) => roomsApi.closeRoom(roomCode, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: roomKeys.rooms })
       invalidateRoom(queryClient, roomCode)
     }
   })
