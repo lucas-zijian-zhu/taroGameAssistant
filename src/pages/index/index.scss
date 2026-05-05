@@ -182,6 +182,10 @@
   margin-top: 22px;
 }
 
+.join-box.with-profile {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 180px 180px;
+}
+
 .field {
   display: block;
   width: 100%;
@@ -198,6 +202,10 @@
 
 .deal-button {
   flex: 0 0 140px;
+}
+
+.profile-button {
+  flex: 0 0 180px;
 }
 
 .player-list {
@@ -652,6 +660,7 @@ button::after {
 
   .room-code,
   .secondary-button,
+  .profile-button,
   .deal-button {
     width: 100%;
     flex-basis: auto;

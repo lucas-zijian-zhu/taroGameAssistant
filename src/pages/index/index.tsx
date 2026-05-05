@@ -64,6 +64,8 @@ const getRoundStatusClassName = (status: string) => {
 }
 
 const appVersion = process.env.TARO_APP_VERSION || '0.0.0'
+const cachedWechatNicknameKey = 'avalon:wechat-nickname'
+const canUseWechatProfile = process.env.TARO_ENV === 'weapp'
 
 const createDefaultPlayerName = (existingNames: string[]) => {
   const existingNameSet = new Set(existingNames)
@@ -190,6 +192,18 @@ export default function Index () {
     refetchRoomsRef.current = roomsQuery.refetch
   }, [roomsQuery.refetch])
 
+  useEffect(() => {
+    if (!canUseWechatProfile || playerName.trim()) {
+      return
+    }
+
+    const cachedNickname = Taro.getStorageSync<string>(cachedWechatNicknameKey)
+
+    if (cachedNickname) {
+      setPlayerName(cachedNickname)
+    }
+  }, [playerName, setPlayerName])
+
   const getButtonClassName = (className: string, disabled: boolean) => {
     return disabled ? `${className} button-disabled` : className
   }
@@ -285,13 +299,73 @@ export default function Index () {
     showToast(apiError.data?.message || fallback)
   }
 
+  const requestWechatNickname = async (showDeniedToast: boolean) => {
+    if (!canUseWechatProfile) {
+      if (showDeniedToast) {
+        showToast('当前环境不支持微信昵称授权')
+      }
+
+      return ''
+    }
+
+    try {
+      const result = await Taro.getUserProfile({
+        desc: '用于快速填写房间玩家昵称'
+      })
+      const nickname = result.userInfo.nickName.trim()
+
+      if (!nickname) {
+        if (showDeniedToast) {
+          showToast('未获取到微信昵称')
+        }
+
+        return ''
+      }
+
+      Taro.setStorageSync(cachedWechatNicknameKey, nickname)
+      setPlayerName(nickname)
+      return nickname
+    } catch (error) {
+      if (showDeniedToast) {
+        showToast('未授权微信昵称')
+      }
+
+      return ''
+    }
+  }
+
+  const getPlayerNameOrWechatNickname = async () => {
+    const trimmedName = playerName.trim()
+
+    if (trimmedName) {
+      return trimmedName
+    }
+
+    if (!canUseWechatProfile) {
+      return ''
+    }
+
+    const cachedNickname = Taro.getStorageSync<string>(cachedWechatNicknameKey)
+
+    if (cachedNickname) {
+      setPlayerName(cachedNickname)
+      return cachedNickname
+    }
+
+    return requestWechatNickname(false)
+  }
+
+  const handleUseWechatNickname = async () => {
+    await requestWechatNickname(true)
+  }
+
   const handleCreateRoom = async () => {
     if (hasJoinedRoom) {
       showToast('已在房间中，不能创建其他房间')
       return
     }
 
-    const hostName = playerName.trim() || '房主'
+    const hostName = (await getPlayerNameOrWechatNickname()) || '房主'
 
     try {
       const data = await createRoomMutation.mutateAsync({
@@ -318,7 +392,7 @@ export default function Index () {
     }
 
     const code = targetRoomCode || roomCode || joinCode.trim().toUpperCase()
-    const name = playerName.trim() || createDefaultPlayerName(players.map((player) => player.name))
+    const name = (await getPlayerNameOrWechatNickname()) || createDefaultPlayerName(players.map((player) => player.name))
 
     if (!code) {
       showToast(localJoinRoom().message)
@@ -582,11 +656,6 @@ export default function Index () {
     }
   }
 
-  const handleReset = () => {
-    clearPlayerSession()
-    reset()
-  }
-
   return (
     <View className='avalon-page'>
       <View className='hero'>
@@ -630,12 +699,9 @@ export default function Index () {
               <Button className={getButtonClassName('primary-button', !canCreateRoom)} disabled={!canCreateRoom} loading={createRoomMutation.isPending} onClick={handleCreateRoom}>
                 创建房间
               </Button>
-              <Button className='ghost-button' onClick={handleReset}>
-                重置
-              </Button>
             </View>
 
-            <View className='join-box'>
+            <View className={canUseWechatProfile ? 'join-box with-profile' : 'join-box'}>
               <Input
                 className='field'
                 disabled={!canJoinRoom}
@@ -652,6 +718,11 @@ export default function Index () {
                 value={playerName}
                 onInput={(event) => setPlayerName(String(event.detail.value))}
               />
+              {canUseWechatProfile && (
+                <Button className={getButtonClassName('ghost-button profile-button', !canJoinRoom)} disabled={!canJoinRoom} onClick={handleUseWechatNickname}>
+                  微信昵称
+                </Button>
+              )}
               <Button className={getButtonClassName('secondary-button', !canJoinRoom)} disabled={!canJoinRoom} loading={joinRoomMutation.isPending} onClick={() => handleJoinRoom()}>
                 加入房间
               </Button>
