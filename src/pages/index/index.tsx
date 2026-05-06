@@ -1092,27 +1092,30 @@ export default function Index () {
               const rejectVoters = Object.entries(teamVotes)
                 .filter(([, vote]) => vote === 'reject')
                 .map(([playerId]) => getPlayerName(playerId))
-              const hasPublicTeamVotes = approveVoters.length > 0 || rejectVoters.length > 0
+              const teamMembers = result.teamPlayerIds.map((playerId) => getPlayerName(playerId))
+              const leaderName = result.leaderPlayerId ? getPlayerName(result.leaderPlayerId) : '-'
+              const hasMissionVotes = result.missionCompleted || result.successCount > 0 || result.failCount > 0
 
               return (
                 <View key={`${result.round}-${index}`} className='mission-item history-item'>
                   <View className='history-main'>
                     <Text className='mission-round'>第{result.round}轮</Text>
-                    <Text className='mission-detail'>
-                      {result.teamVoteForced
-                        ? '第 5 次组队，强制出任务'
-                        : `同意 ${result.approveCount} / 反对 ${result.rejectCount}`}
-                    </Text>
                     <Text className={getRoundStatusClassName(result.status)}>
                       {getRoundStatusText(result.status)}
                     </Text>
                   </View>
-                  {hasPublicTeamVotes ? (
-                    <View className='history-vote-detail'>
-                      <Text className='history-vote-text'>赞同：{approveVoters.join('、') || '-'}</Text>
-                      <Text className='history-vote-text'>反对：{rejectVoters.join('、') || '-'}</Text>
-                    </View>
-                  ) : null}
+                  <View className='history-section'>
+                    <Text className='history-section-title'>组队</Text>
+                    <Text className='history-vote-text'>队长：{leaderName}</Text>
+                    <Text className='history-vote-text'>队员：{teamMembers.join('、') || '-'}</Text>
+                    <Text className='history-vote-text'>赞同组队：{result.teamVoteForced ? '强制出任务' : approveVoters.join('、') || '-'}</Text>
+                    <Text className='history-vote-text'>反对组队：{result.teamVoteForced ? '-' : rejectVoters.join('、') || '-'}</Text>
+                  </View>
+                  <View className='history-section'>
+                    <Text className='history-section-title'>任务</Text>
+                    <Text className='history-vote-text'>成功：{hasMissionVotes ? `${result.successCount} 票` : '待结算'}</Text>
+                    <Text className='history-vote-text'>失败：{hasMissionVotes ? `${result.failCount} 票` : '待结算'}</Text>
+                  </View>
                 </View>
               )
             })}

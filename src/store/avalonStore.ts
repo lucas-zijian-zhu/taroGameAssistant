@@ -154,6 +154,7 @@ const resolveMissionVote = (state: AvalonState): Partial<AvalonState> => {
     ...state.history,
     {
       round: mission.round,
+      leaderPlayerId: state.players[state.leaderIndex]?.id,
       teamPlayerIds: state.selectedTeamIds,
       teamVotes: state.teamVotes,
       teamVoteForced: false,
@@ -239,6 +240,7 @@ export const useAvalonStore = create<AvalonState>((set, get) => ({
 
         return {
           round: result.round,
+          leaderPlayerId: result.leaderPlayerId,
           teamPlayerIds: asArray(result.teamPlayerIds),
           teamVotes: asRecord(teamVoteResult.votes),
           teamVoteForced: Boolean(teamVoteResult.forced),

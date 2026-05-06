@@ -48,6 +48,7 @@ export type GamePhase =
 
 export type RoundResult = {
   round: number
+  leaderPlayerId?: string
   teamPlayerIds: string[]
   teamVotes: Record<string, TeamVote>
   teamVoteForced: boolean

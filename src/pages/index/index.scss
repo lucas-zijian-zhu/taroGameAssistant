@@ -709,7 +709,7 @@
 
 .history-main {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
 }
@@ -721,11 +721,19 @@
   padding: 4px 0;
 }
 
-.history-vote-detail {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-  padding-top: 4px;
+.history-section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  padding-top: 8px;
+}
+
+.history-section-title {
+  grid-column: 1 / -1;
+  color: #111820;
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 1.3;
 }
 
 .history-vote-text {
