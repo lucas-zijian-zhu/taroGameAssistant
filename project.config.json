@@ -1,8 +1,9 @@
 {
   "miniprogramRoot": "dist/",
   "projectname": "taroGameAssistant",
+  "version": "1.0.1",
   "description": "桌游小助手，提供阿瓦隆，狼人杀等游戏的小程序或者H5的辅助功能",
-  "appid": "wx18d872e8b13da0a5",
+  "appid": "touristappid",
   "setting": {
     "urlCheck": true,
     "es6": false,
