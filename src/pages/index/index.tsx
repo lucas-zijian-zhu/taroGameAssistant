@@ -1095,6 +1095,7 @@ export default function Index () {
               const teamMembers = result.teamPlayerIds.map((playerId) => getPlayerName(playerId))
               const leaderName = result.leaderPlayerId ? getPlayerName(result.leaderPlayerId) : '-'
               const hasMissionVotes = result.missionCompleted || result.successCount > 0 || result.failCount > 0
+              const missionVotePlaceholder = result.status === 'team_rejected' ? '-' : '待结算'
 
               return (
                 <View key={`${result.round}-${index}`} className='mission-item history-item'>
@@ -1108,13 +1109,13 @@ export default function Index () {
                     <Text className='history-section-title'>组队</Text>
                     <Text className='history-vote-text'>队长：{leaderName}</Text>
                     <Text className='history-vote-text'>队员：{teamMembers.join('、') || '-'}</Text>
-                    <Text className='history-vote-text'>赞同组队：{result.teamVoteForced ? '强制出任务' : approveVoters.join('、') || '-'}</Text>
-                    <Text className='history-vote-text'>反对组队：{result.teamVoteForced ? '-' : rejectVoters.join('、') || '-'}</Text>
+                    <Text className='history-vote-text'>赞同组队：{result.teamVoteForced ? '强制出任务' : (approveVoters.join('、') || '-')}</Text>
+                    <Text className='history-vote-text'>反对组队：{result.teamVoteForced ? '-' : (rejectVoters.join('、') || '-')}</Text>
                   </View>
                   <View className='history-section'>
                     <Text className='history-section-title'>任务</Text>
-                    <Text className='history-vote-text'>成功：{hasMissionVotes ? `${result.successCount} 票` : '待结算'}</Text>
-                    <Text className='history-vote-text'>失败：{hasMissionVotes ? `${result.failCount} 票` : '待结算'}</Text>
+                    <Text className='history-vote-text'>成功：{hasMissionVotes ? `${result.successCount} 票` : missionVotePlaceholder}</Text>
+                    <Text className='history-vote-text'>失败：{hasMissionVotes ? `${result.failCount} 票` : missionVotePlaceholder}</Text>
                   </View>
                 </View>
               )
