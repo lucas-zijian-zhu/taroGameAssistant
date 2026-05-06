@@ -59,13 +59,6 @@
   min-width: 0;
 }
 
-.room-status-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px;
-  align-items: center;
-  gap: 16px;
-}
-
 .panel-title,
 .panel-desc {
   display: block;
@@ -118,7 +111,6 @@
 .primary-button,
 .secondary-button,
 .ghost-button,
-.deal-button,
 .text-button {
   box-sizing: border-box;
   margin: 0;
@@ -162,24 +154,15 @@
 
 .primary-button,
 .secondary-button,
-.ghost-button,
-.deal-button {
+.ghost-button {
   min-height: 76px;
   padding: 20px 24px;
   font-size: 28px;
 }
 
-.primary-button,
-.deal-button {
+.primary-button {
   color: #fff;
   background: #176b5c;
-}
-
-.deal-button {
-  width: 132px;
-  min-height: 58px;
-  padding: 12px 16px;
-  font-size: 26px;
 }
 
 .secondary-button {
@@ -214,10 +197,6 @@
   font-size: 28px;
 }
 
-.deal-button {
-  flex: 0 0 140px;
-}
-
 @media (min-width: 760px) {
   .panel-head {
     flex-direction: row;
@@ -248,9 +227,9 @@
 }
 
 .match-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, max-content));
+  justify-content: end;
   gap: 10px;
   margin-top: 18px;
 }
@@ -291,9 +270,9 @@
 }
 
 .lobby-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   box-sizing: border-box;
   min-height: 78px;
@@ -308,6 +287,16 @@
   align-items: center;
   gap: 18px;
   min-width: 0;
+}
+
+.lobby-action {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 96px;
+}
+
+.lobby-button {
+  min-width: 96px;
 }
 
 .lobby-code {
@@ -357,7 +346,7 @@
 
 .player-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
   align-items: center;
   min-height: 88px;
 }
@@ -382,8 +371,9 @@
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  width: auto;
-  max-width: 260px;
+  justify-self: end;
+  min-width: 96px;
+  max-width: 220px;
 }
 
 .seat {
@@ -787,25 +777,14 @@ button::after {
     flex-basis: auto;
   }
 
-  .room-status-head .deal-button {
-    width: 132px;
-    flex-basis: auto;
-  }
-
   .player-row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
     align-items: center;
   }
 
   .player-actions {
     justify-content: flex-end;
-    width: auto;
-    max-width: 210px;
-  }
-
-  .lobby-row {
-    align-items: stretch;
-    flex-direction: column;
+    max-width: 196px;
   }
 
   .small-button {

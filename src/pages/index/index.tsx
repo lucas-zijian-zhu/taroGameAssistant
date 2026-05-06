@@ -823,19 +823,21 @@ export default function Index () {
                     <Text className='lobby-code'>{room.code}</Text>
                     <Text className='lobby-meta'>{roomPlayers.length}/{room.playerCount} 人</Text>
                   </View>
-                  {isAlreadyInRoom ? (
-                    <Text className='lobby-status'>已在房间</Text>
-                  ) : hasJoinedRoom ? (
-                    <Text className='lobby-status muted'>已在其他房间</Text>
-                  ) : (
-                    <Button
-                      className='text-button'
-                      loading={joinRoomMutation.isPending}
-                      onClick={() => handleJoinRoom(room.code)}
-                    >
-                      加入
-                    </Button>
-                  )}
+                  <View className='lobby-action'>
+                    {isAlreadyInRoom ? (
+                      <Text className='lobby-status'>已在房间</Text>
+                    ) : hasJoinedRoom ? (
+                      <Text className='lobby-status muted'>已在其他房间</Text>
+                    ) : (
+                      <Button
+                        className='text-button lobby-button'
+                        loading={joinRoomMutation.isPending}
+                        onClick={() => handleJoinRoom(room.code)}
+                      >
+                        加入
+                      </Button>
+                    )}
+                  </View>
                 </View>
               )
             })()
