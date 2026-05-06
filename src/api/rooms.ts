@@ -158,53 +158,97 @@ const playerHeaders = (playerId?: string) => {
   return playerId ? { 'X-Player-Id': playerId } : undefined
 }
 
+const asArray = <T>(value: T[] | null | undefined): T[] => {
+  return Array.isArray(value) ? value : []
+}
+
+const normalizeRoom = (room: RemoteRoom | null | undefined): RemoteRoom => {
+  const safeRoom = room || {
+    id: '',
+    code: '',
+    status: 'closed' as RemoteRoomStatus,
+    playerCount: 0,
+    roleConfig: [],
+    players: [],
+    createdAt: ''
+  }
+
+  return {
+    ...safeRoom,
+    roleConfig: asArray(safeRoom.roleConfig),
+    players: asArray(safeRoom.players)
+  }
+}
+
+const normalizeRoomResponse = <T extends { room: RemoteRoom }>(response: T): T => {
+  return {
+    ...response,
+    room: normalizeRoom(response.room)
+  }
+}
+
+const normalizeRoomsResponse = (response: RoomsResponse | null | undefined): RoomsResponse => {
+  const rooms = asArray(response?.rooms).map(normalizeRoom)
+
+  return {
+    rooms
+  }
+}
+
+const normalizeRoomStateResponse = (response: RoomStateResponse): RoomStateResponse => {
+  return {
+    ...response,
+    room: normalizeRoom(response.room)
+  }
+}
+
 export const createRoom = (payload: CreateRoomPayload) => {
   return apiRequest<JoinRoomResponse>('/rooms', {
     method: 'POST',
     body: payload
-  })
+  }).then(normalizeRoomResponse)
 }
 
 export const joinRoom = (roomCode: string, payload: JoinRoomPayload) => {
   return apiRequest<JoinRoomResponse>(`/rooms/${roomCode}/join`, {
     method: 'POST',
     body: payload
-  })
+  }).then(normalizeRoomResponse)
 }
 
 export const listRooms = () => {
-  return apiRequest<RoomsResponse>('/rooms')
+  return apiRequest<RoomsResponse>('/rooms').then(normalizeRoomsResponse)
 }
 
 export const updateRoleConfig = (roomCode: string, payload: UpdateRoleConfigPayload) => {
   return apiRequest<RoomResponse>(`/rooms/${roomCode}/role-config`, {
     method: 'PUT',
     body: payload
-  })
+  }).then(normalizeRoomResponse)
 }
 
 export const setReady = (roomCode: string, payload: ReadyPayload) => {
   return apiRequest<RoomResponse>(`/rooms/${roomCode}/ready`, {
     method: 'POST',
     body: payload
-  })
+  }).then(normalizeRoomResponse)
 }
 
 export const getRoom = (roomCode: string) => {
-  return apiRequest<RoomResponse>(`/rooms/${roomCode}`)
+  return apiRequest<RoomResponse>(`/rooms/${roomCode}`).then(normalizeRoomResponse)
 }
 
 export const getRoomState = (roomCode: string, playerId?: string) => {
   return apiRequest<RoomStateResponse>(`/rooms/${roomCode}/state`, {
     headers: playerHeaders(playerId)
-  })
+  }).then(normalizeRoomStateResponse)
 }
 
 export const leaveRoom = (roomCode: string, payload: PlayerPayload) => {
   return apiRequest<RoomResponse>(`/rooms/${roomCode}/leave`, {
     method: 'POST',
     body: payload
-  })
+  }).then(normalizeRoomResponse)
 }
 
 export const closeRoom = (roomCode: string, payload: { hostPlayerId: string }) => {
@@ -212,7 +256,7 @@ export const closeRoom = (roomCode: string, payload: { hostPlayerId: string }) =
     method: 'POST',
     body: payload,
     headers: playerHeaders(payload.hostPlayerId)
-  })
+  }).then(normalizeRoomResponse)
 }
 
 export const startGame = (roomCode: string, payload: { hostPlayerId: string }) => {
@@ -288,5 +332,5 @@ export const resetGame = (roomCode: string, payload: { hostPlayerId: string }) =
     method: 'POST',
     body: payload,
     headers: playerHeaders(payload.hostPlayerId)
-  })
+  }).then(normalizeRoomResponse)
 }

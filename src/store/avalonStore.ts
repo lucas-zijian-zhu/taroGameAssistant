@@ -90,8 +90,16 @@ const countVotes = <T extends string>(votes: Record<string, T>, value: T) => {
   return Object.values(votes).filter((vote) => vote === value).length
 }
 
-const progressToSubmittedMap = <T extends TeamVote | MissionVote>(players: Record<string, string>, submittedValue: T) => {
-  return Object.entries(players).reduce<Record<string, T>>((result, [playerId, status]) => {
+const asArray = <T>(value: T[] | null | undefined): T[] => {
+  return Array.isArray(value) ? value : []
+}
+
+const asRecord = <T>(value: Record<string, T> | null | undefined): Record<string, T> => {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+const progressToSubmittedMap = <T extends TeamVote | MissionVote>(players: Record<string, string> | null | undefined, submittedValue: T) => {
+  return Object.entries(asRecord(players)).reduce<Record<string, T>>((result, [playerId, status]) => {
     if (status === 'submitted') {
       result[playerId] = submittedValue
     }
@@ -105,7 +113,7 @@ const getRoundHistoryStatus = (result: RemoteGame['history'][number]): RoundHist
     return result.status
   }
 
-  if (!result.teamVoteResult.passed) {
+  if (!result.teamVoteResult?.passed) {
     return 'team_rejected'
   }
 
@@ -184,7 +192,7 @@ export const useAvalonStore = create<AvalonState>((set, get) => ({
   syncRemoteRoom: (room, currentPlayerId) => set((state) => ({
     roomCode: room.code,
     playerCount: Number(room.playerCount),
-    players: room.players.map((player) => ({
+    players: asArray(room.players).map((player) => ({
       id: player.id,
       name: player.name,
       isHost: player.isHost,
@@ -216,21 +224,26 @@ export const useAvalonStore = create<AvalonState>((set, get) => ({
       phase: game.phase,
       roundIndex: Math.max(0, game.round - 1),
       leaderIndex,
-      selectedTeamIds: game.teamPlayerIds,
-      teamVotes: progressToSubmittedMap(game.teamVoteProgress.players, 'approve'),
-      missionVotes: progressToSubmittedMap(game.missionVoteProgress.players, 'success'),
+      selectedTeamIds: asArray(game.teamPlayerIds),
+      teamVotes: progressToSubmittedMap(game.teamVoteProgress?.players, 'approve'),
+      missionVotes: progressToSubmittedMap(game.missionVoteProgress?.players, 'success'),
       visibleRoleInfo: visibleRoleInfo === undefined ? state.visibleRoleInfo : visibleRoleInfo,
       winner: game.winner,
-      history: game.history.map((result) => {
+      history: asArray(game.history).map((result) => {
         const status = getRoundHistoryStatus(result)
+        const teamVoteResult = result.teamVoteResult || {
+          approveCount: 0,
+          rejectCount: 0,
+          passed: false
+        }
 
         return {
           round: result.round,
-          teamPlayerIds: result.teamPlayerIds,
-          teamVotes: result.teamVoteResult.votes || {},
-          teamVoteForced: Boolean(result.teamVoteResult.forced),
-          approveCount: result.teamVoteResult.approveCount,
-          rejectCount: result.teamVoteResult.rejectCount,
+          teamPlayerIds: asArray(result.teamPlayerIds),
+          teamVotes: asRecord(teamVoteResult.votes),
+          teamVoteForced: Boolean(teamVoteResult.forced),
+          approveCount: teamVoteResult.approveCount,
+          rejectCount: teamVoteResult.rejectCount,
           successCount: result.missionResult?.successCount || 0,
           failCount: result.missionResult?.failCount || 0,
           status,

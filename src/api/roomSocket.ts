@@ -104,6 +104,10 @@ export const useLobbySocket = ({
     let taroSocket: Taro.SocketTask | null = null
 
     const handleMessage = (data: unknown) => {
+      if (typeof data === 'string' && data.includes('"type":"connection.ready"')) {
+        return
+      }
+
       const message = parseSocketMessage(data)
 
       if (!message) {

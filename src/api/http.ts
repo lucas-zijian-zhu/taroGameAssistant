@@ -40,9 +40,10 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}) 
     'Content-Type': 'application/json',
     ...options.headers
   }
+  const url = buildUrl(path)
 
   if (isH5Runtime()) {
-    const response = await fetch(buildUrl(path), {
+    const response = await fetch(url, {
       method,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body)
@@ -51,16 +52,30 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}) 
     return parseResponse<T>(response)
   }
 
-  const response = await Taro.request({
-    url: buildUrl(path),
-    method,
-    header: headers,
-    data: options.body
-  })
+  let response: Taro.request.SuccessCallbackResult
 
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw new ApiError(response.statusCode, response.data)
+  try {
+    response = await Taro.request({
+      url,
+      method,
+      header: headers,
+      data: options.body
+    })
+  } catch (error) {
+    throw error
   }
 
-  return response.data as T
+  let data: unknown
+
+  try {
+    data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data
+  } catch (error) {
+    throw error
+  }
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new ApiError(response.statusCode, data)
+  }
+
+  return data as T
 }

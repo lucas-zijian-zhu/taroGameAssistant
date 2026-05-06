@@ -1,8 +1,8 @@
 import { Button, Input, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLobbySocket, useRoomSocket } from '@/api/roomSocket'
-import { getRoomState } from '@/api/rooms'
+import { getRoomState, listRooms, type RoomsResponse } from '@/api/rooms'
 import {
   useCloseRoomMutation,
   useCreateRoomMutation,
@@ -13,7 +13,6 @@ import {
   useNextRoundMutation,
   useReadyMutation,
   useResetGameMutation,
-  useRoomsQuery,
   useStartGameMutation,
   useSubmitMissionVoteMutation,
   useSubmitTeamMutation,
@@ -159,10 +158,13 @@ export default function Index () {
       ? '刺杀正确，刺客命中梅林。'
       : '刺杀失败，梅林存活。'
     : ''
+  const [roomsData, setRoomsData] = useState<RoomsResponse | null>(null)
+  const [roomsIsLoading, setRoomsIsLoading] = useState(false)
+  const [roomsIsFetching, setRoomsIsFetching] = useState(false)
+  const [roomsError, setRoomsError] = useState<unknown>(null)
   const createRoomMutation = useCreateRoomMutation()
   const joinRoomMutation = useJoinRoomMutation()
-  const roomsQuery = useRoomsQuery({ enabled: !hasJoinedRoom })
-  const refetchRoomsRef = useRef(roomsQuery.refetch)
+  const refetchRoomsRef = useRef<() => Promise<void>>(async () => undefined)
   const lobbyRoomsRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lobbyPlayerId = useMemo(() => getLobbyPlayerId(), [])
   const closeRoomMutation = useCloseRoomMutation(roomCode)
@@ -177,8 +179,16 @@ export default function Index () {
   const assassinateMutation = useAssassinateMutation(roomCode)
   const resetGameMutation = useResetGameMutation(roomCode)
   const joinableRooms = useMemo(() => {
-    return (roomsQuery.data?.rooms || []).filter((room) => room.status === 'lobby' && room.players.length < room.playerCount)
-  }, [roomsQuery.data?.rooms])
+    const rooms = Array.isArray(roomsData?.rooms) ? roomsData.rooms : []
+
+    return rooms.filter((room) => {
+      const roomPlayers = Array.isArray(room.players) ? room.players : []
+
+      return room.status === 'lobby' && roomPlayers.length < room.playerCount
+    })
+  }, [roomsData?.rooms])
+  const typedRoomsError = roomsError as { data?: { message?: string }, message?: string } | null
+  const roomsErrorText = typedRoomsError?.data?.message || typedRoomsError?.message || '大厅列表加载失败'
 
   const getPlayerName = useCallback((playerId: string) => {
     return players.find((player) => player.id === playerId)?.name || playerId
@@ -190,9 +200,39 @@ export default function Index () {
     }
   }, [])
 
+  const refetchRooms = useCallback(async () => {
+    if (hasJoinedRoom) {
+      return
+    }
+
+    setRoomsIsFetching(true)
+    setRoomsError(null)
+
+    try {
+      const data = await listRooms()
+      setRoomsData(data)
+    } catch (error) {
+      setRoomsError(error)
+    } finally {
+      setRoomsIsFetching(false)
+      setRoomsIsLoading(false)
+    }
+  }, [hasJoinedRoom])
+
   useEffect(() => {
-    refetchRoomsRef.current = roomsQuery.refetch
-  }, [roomsQuery.refetch])
+    refetchRoomsRef.current = refetchRooms
+  }, [refetchRooms])
+
+  useEffect(() => {
+    if (hasJoinedRoom) {
+      setRoomsIsLoading(false)
+      setRoomsIsFetching(false)
+      return
+    }
+
+    setRoomsIsLoading(true)
+    refetchRooms()
+  }, [hasJoinedRoom, refetchRooms])
 
   useEffect(() => {
     return () => {
@@ -223,7 +263,8 @@ export default function Index () {
   }, [syncRemoteGame])
 
   const handleSocketRoomUpdated = useCallback((room) => {
-    const isStillInRoom = room.players.some((player) => player.id === currentPlayerId)
+    const roomPlayers = Array.isArray(room.players) ? room.players : []
+    const isStillInRoom = roomPlayers.some((player) => player.id === currentPlayerId)
 
     if (room.status === 'closed' || (currentPlayerId && !isStillInRoom)) {
       clearPlayerSession()
@@ -236,7 +277,8 @@ export default function Index () {
   }, [currentPlayerId, reset, showToast, syncRemoteRoom])
 
   const handleSocketStateLoaded = useCallback((state) => {
-    const isStillInRoom = state.room.players.some((player) => player.id === currentPlayerId)
+    const roomPlayers = Array.isArray(state.room.players) ? state.room.players : []
+    const isStillInRoom = roomPlayers.some((player) => player.id === currentPlayerId)
 
     if (state.room.status === 'closed' || (currentPlayerId && !isStillInRoom)) {
       clearPlayerSession()
@@ -271,6 +313,10 @@ export default function Index () {
     }, 300)
   }, [])
 
+  const handleManualRefreshRooms = useCallback(() => {
+    refetchRooms()
+  }, [refetchRooms])
+
   useEffect(() => {
     const session = getPlayerSession()
 
@@ -279,7 +325,8 @@ export default function Index () {
     }
 
     getRoomState(session.roomCode, session.playerId).then((state) => {
-      const isStillInRoom = state.room.players.some((player) => player.id === session.playerId)
+      const roomPlayers = Array.isArray(state.room.players) ? state.room.players : []
+      const isStillInRoom = roomPlayers.some((player) => player.id === session.playerId)
 
       if (state.room.status === 'closed' || !isStillInRoom) {
         clearPlayerSession()
@@ -706,7 +753,7 @@ export default function Index () {
           <Text className='room-code'>{roomCode || '未创建'}</Text>
         </View>
 
-        {!hasJoinedRoom && (
+        {!hasJoinedRoom ? (
           <View className='toolbar'>
             {PLAYER_COUNTS.map((count) => (
               (() => {
@@ -726,17 +773,17 @@ export default function Index () {
               })()
             ))}
           </View>
-        )}
+        ) : null}
 
-        {!hasJoinedRoom && (
+        {!hasJoinedRoom ? (
           <View className='action-grid'>
             <Button className={getButtonClassName('primary-button', !canCreateRoom)} disabled={!canCreateRoom} loading={createRoomMutation.isPending} onClick={handleCreateRoom}>
               创建房间
             </Button>
           </View>
-        )}
+        ) : null}
 
-        {!hasJoinedRoom && (
+        {!hasJoinedRoom ? (
           <View className={canUseWechatProfile ? 'join-box with-profile' : 'join-box'}>
             <Input
               className='field'
@@ -754,44 +801,53 @@ export default function Index () {
               value={playerName}
               onInput={(event) => setPlayerName(String(event.detail.value))}
             />
-            {canUseWechatProfile && (
+            {canUseWechatProfile ? (
               <Button className={getButtonClassName('ghost-button profile-button', !canJoinRoom)} disabled={!canJoinRoom} onClick={handleUseWechatNickname}>
                 微信昵称
               </Button>
-            )}
+            ) : null}
             <Button className={getButtonClassName('secondary-button', !canJoinRoom)} disabled={!canJoinRoom} loading={joinRoomMutation.isPending} onClick={() => handleJoinRoom()}>
               加入房间
             </Button>
           </View>
-        )}
+        ) : null}
       </View>
 
-      {!hasJoinedRoom && (
+      {!hasJoinedRoom ? (
         <View className='panel'>
         <View className='panel-head'>
           <View>
             <Text className='panel-title'>当前大厅</Text>
             <Text className='panel-desc'>只展示等待中且未满员的房间。</Text>
           </View>
-          <Button className='text-button' loading={roomsQuery.isFetching} onClick={() => roomsQuery.refetch()}>
+          <Button className='text-button' loading={roomsIsFetching} onClick={handleManualRefreshRooms}>
             刷新
           </Button>
         </View>
 
         <View className='lobby-list'>
-          {joinableRooms.length === 0 && (
+          {roomsIsLoading ? (
+            <Text className='empty-text'>大厅同步中</Text>
+          ) : null}
+
+          {roomsError ? (
+            <Text className='empty-text'>{roomsErrorText}</Text>
+          ) : null}
+
+          {!roomsIsLoading && !roomsError && joinableRooms.length === 0 ? (
             <Text className='empty-text'>暂无可加入房间</Text>
-          )}
+          ) : null}
 
           {joinableRooms.map((room) => (
             (() => {
-              const isAlreadyInRoom = room.players.some((player) => player.id === currentPlayerId)
+              const roomPlayers = Array.isArray(room.players) ? room.players : []
+              const isAlreadyInRoom = roomPlayers.some((player) => player.id === currentPlayerId)
 
               return (
                 <View key={room.id} className='lobby-row'>
                   <View className='lobby-main'>
                     <Text className='lobby-code'>{room.code}</Text>
-                    <Text className='lobby-meta'>{room.players.length}/{room.playerCount} 人</Text>
+                    <Text className='lobby-meta'>{roomPlayers.length}/{room.playerCount} 人</Text>
                   </View>
                   {isAlreadyInRoom ? (
                     <Text className='lobby-status'>已在房间</Text>
@@ -812,26 +868,26 @@ export default function Index () {
           ))}
         </View>
         </View>
-      )}
+      ) : null}
 
-      {hasJoinedRoom && (
+      {hasJoinedRoom ? (
         <View className='panel'>
           <View className='panel-head'>
             <View>
               <Text className='panel-title'>房间</Text>
               <Text className='panel-desc'>{roomCode}，{players.length}/{playerCount} 已加入，{readyPlayerCount}/{players.length || playerCount} 已准备</Text>
             </View>
-            {isCurrentPlayerHost && (
+            {isCurrentPlayerHost ? (
               <Button className={getButtonClassName('deal-button', !canStartGame)} disabled={!canStartGame} loading={startGameMutation.isPending} onClick={handleStartGame}>
                 开始
               </Button>
-            )}
+            ) : null}
           </View>
 
           <View className='player-list'>
-            {players.length === 0 && (
+            {players.length === 0 ? (
               <Text className='empty-text'>等待玩家加入</Text>
-            )}
+            ) : null}
 
             {players.map((player, index) => {
               const isLeader = leader?.id === player.id && hasGameStarted
@@ -842,59 +898,59 @@ export default function Index () {
                   <View className='player-main'>
                     <Text className='seat'>#{index + 1}</Text>
                     <Text className='player-name'>{player.name}</Text>
-                    {isLeader && <Text className='tag'>队长</Text>}
-                    {player.isHost && <Text className='tag'>房主</Text>}
-                    {canEditLobby && player.isReady && <Text className='tag ready'>已准备</Text>}
+                    {isLeader ? <Text className='tag'>队长</Text> : null}
+                    {player.isHost ? <Text className='tag'>房主</Text> : null}
+                    {canEditLobby && player.isReady ? <Text className='tag ready'>已准备</Text> : null}
                   </View>
                   <View className='player-actions'>
-                    {canEditLobby && isCurrentPlayerHost && player.id !== currentPlayerId && (
+                    {canEditLobby && isCurrentPlayerHost && player.id !== currentPlayerId ? (
                       <Button className='text-button' loading={leaveRoomMutation.isPending} onClick={() => handleLeaveRoom(player.id)}>
                         移除
                       </Button>
-                    )}
-                    {player.id === currentPlayerId && !player.isHost && (
+                    ) : null}
+                    {player.id === currentPlayerId && !player.isHost ? (
                       <Button className='text-button' loading={leaveRoomMutation.isPending} onClick={() => handleLeaveRoom(player.id)}>
                         退出
                       </Button>
-                    )}
-                    {player.id === currentPlayerId && player.isHost && (
+                    ) : null}
+                    {player.id === currentPlayerId && player.isHost ? (
                       <Button className='text-button' loading={closeRoomMutation.isPending} onClick={handleDissolveRoom}>
                         解散
                       </Button>
-                    )}
-                    {canEditLobby && player.id === currentPlayerId && !player.isHost && (
+                    ) : null}
+                    {canEditLobby && player.id === currentPlayerId && !player.isHost ? (
                       <Button className='text-button' loading={readyMutation.isPending} onClick={() => handleReady(player.id, !player.isReady)}>
                         {player.isReady ? '取消' : '准备'}
                       </Button>
-                    )}
-                    {hasGameStarted && player.id === currentPlayerId && (
+                    ) : null}
+                    {hasGameStarted && player.id === currentPlayerId ? (
                       <Button className='text-button' onClick={() => setActivePlayer(activePlayerId === player.id ? '' : player.id)}>
                         {activePlayerId === player.id ? '隐藏身份' : '看我的身份'}
                       </Button>
-                    )}
-                    {canBuildTeam && (
+                    ) : null}
+                    {canBuildTeam ? (
                       <Button className='text-button' onClick={() => toggleTeamMember(player.id)}>
                         {isSelected ? '取消' : '选中'}
                       </Button>
-                    )}
+                    ) : null}
                   </View>
                 </View>
               )
             })}
           </View>
         </View>
-      )}
+      ) : null}
 
-      {hasGameStarted && activePlayer && activeRole && (
+      {hasGameStarted && activePlayer && activeRole ? (
         <View className={activeRole.team === 'good' ? 'role-card good' : 'role-card evil'}>
           <Text className='role-owner'>{activePlayer.name} 的身份</Text>
           <Text className='role-name'>{activeRole.name}</Text>
           <Text className='role-team'>{activeRole.team === 'good' ? '好人阵营' : '坏人阵营'}</Text>
           <Text className='role-desc'>{activeRole.description}</Text>
         </View>
-      )}
+      ) : null}
 
-      {hasGameStarted && (
+      {hasGameStarted ? (
         <View className='panel'>
           <View className='panel-head'>
             <View>
@@ -909,20 +965,20 @@ export default function Index () {
             </View>
           </View>
 
-          {(phase === 'role_reveal' || phase === 'speech') && (
+          {(phase === 'role_reveal' || phase === 'speech') ? (
             <View className='phase-box'>
               <Text className='phase-text'>
                 {phase === 'role_reveal' ? '请各自查看身份，确认后进入发言讨论。' : '线下讨论完成后，由队长选择出任务队伍。'}
               </Text>
-              {phase === 'role_reveal' && (
+              {phase === 'role_reveal' ? (
                 <Button className='primary-button' loading={enterSpeechMutation.isPending} onClick={handleEnterSpeech}>
                   进入发言
                 </Button>
-              )}
+              ) : null}
             </View>
-          )}
+          ) : null}
 
-          {(phase === 'team_building' || phase === 'speech') && (
+          {(phase === 'team_building' || phase === 'speech') ? (
             <View className='phase-box'>
               <Text className='phase-text'>已选择 {selectedTeamIds.length}/{currentMission.teamSize}</Text>
               {isCurrentPlayerLeader ? (
@@ -933,9 +989,9 @@ export default function Index () {
                 <Text className='phase-text'>等待队长提交队伍</Text>
               )}
             </View>
-          )}
+          ) : null}
 
-          {phase === 'team_vote' && (
+          {phase === 'team_vote' ? (
             <View className='phase-box'>
               <Text className='phase-text'>本次出任务队伍</Text>
               <View className='team-chip-list'>
@@ -947,7 +1003,7 @@ export default function Index () {
                 {players.map((player) => (
                   <View key={player.id} className='vote-row'>
                     <Text className='player-name'>{player.name}</Text>
-                    {player.id === currentPlayerId && canVoteForTeam && (
+                    {player.id === currentPlayerId && canVoteForTeam ? (
                       <View className='vote-actions'>
                         <Button className='small-button approve' loading={submitTeamVoteMutation.isPending} onClick={() => handleTeamVote(player.id, 'approve')}>
                           同意
@@ -956,15 +1012,15 @@ export default function Index () {
                           反对
                         </Button>
                       </View>
-                    )}
+                    ) : null}
                     <Text className='vote-state'>{teamVotes[player.id] ? '已投' : '待投'}</Text>
                   </View>
                 ))}
               </View>
             </View>
-          )}
+          ) : null}
 
-          {phase === 'mission_vote' && (
+          {phase === 'mission_vote' ? (
             <View className='phase-box'>
               <Text className='phase-text'>出任务队伍</Text>
               <View className='team-chip-list'>
@@ -976,7 +1032,7 @@ export default function Index () {
                 {players.filter((player) => selectedTeamIds.includes(player.id)).map((player) => (
                   <View key={player.id} className='vote-row'>
                     <Text className='player-name'>{player.name}</Text>
-                    {player.id === currentPlayerId && canVoteForMission && (
+                    {player.id === currentPlayerId && canVoteForMission ? (
                       <View className='vote-actions'>
                         <Button className='small-button approve' loading={submitMissionVoteMutation.isPending} onClick={() => handleMissionVote(player.id, 'success')}>
                           成功
@@ -985,15 +1041,15 @@ export default function Index () {
                           失败
                         </Button>
                       </View>
-                    )}
+                    ) : null}
                     <Text className='vote-state'>{missionVotes[player.id] ? '已投' : '待投'}</Text>
                   </View>
                 ))}
               </View>
             </View>
-          )}
+          ) : null}
 
-          {phase === 'round_result' && latestResult && (
+          {phase === 'round_result' && latestResult ? (
             <View className='phase-box'>
               <Text className={latestResult.passed ? 'result-text good' : 'result-text evil'}>
                 本轮{latestResult.passed ? '成功' : '失败'}，成功票 {latestResult.successCount}，失败票 {latestResult.failCount}
@@ -1002,9 +1058,9 @@ export default function Index () {
                 下一轮
               </Button>
             </View>
-          )}
+          ) : null}
 
-          {phase === 'assassination' && (
+          {phase === 'assassination' ? (
             <View className='phase-box'>
               <Text className='result-text evil'>好人完成三次任务成功，刺客请选择梅林。</Text>
               {canAssassinate ? (
@@ -1022,25 +1078,25 @@ export default function Index () {
                 <Text className='phase-text'>等待刺客刺杀梅林</Text>
               )}
             </View>
-          )}
+          ) : null}
 
-          {phase === 'finished' && (
+          {phase === 'finished' ? (
             <View className='phase-box'>
               <Text className={finalResultClassName}>{finalResultText}</Text>
-              {assassinationResultText && (
+              {assassinationResultText ? (
                 <Text className={finalResultClassName}>{assassinationResultText}</Text>
-              )}
-              {isCurrentPlayerHost && (
+              ) : null}
+              {isCurrentPlayerHost ? (
                 <Button className='primary-button' loading={resetGameMutation.isPending} onClick={handleRestartGame}>
                   重开对局
                 </Button>
-              )}
+              ) : null}
             </View>
-          )}
+          ) : null}
         </View>
-      )}
+      ) : null}
 
-      {history.length > 0 && (
+      {history.length > 0 ? (
         <View className='panel'>
           <View className='panel-head'>
             <View>
@@ -1050,10 +1106,11 @@ export default function Index () {
           </View>
           <View className='mission-list'>
             {history.map((result, index) => {
-              const approveVoters = Object.entries(result.teamVotes)
+              const teamVotes = result.teamVotes && typeof result.teamVotes === 'object' ? result.teamVotes : {}
+              const approveVoters = Object.entries(teamVotes)
                 .filter(([, vote]) => vote === 'approve')
                 .map(([playerId]) => getPlayerName(playerId))
-              const rejectVoters = Object.entries(result.teamVotes)
+              const rejectVoters = Object.entries(teamVotes)
                 .filter(([, vote]) => vote === 'reject')
                 .map(([playerId]) => getPlayerName(playerId))
               const hasPublicTeamVotes = approveVoters.length > 0 || rejectVoters.length > 0
@@ -1071,18 +1128,18 @@ export default function Index () {
                       {getRoundStatusText(result.status)}
                     </Text>
                   </View>
-                  {hasPublicTeamVotes && (
+                  {hasPublicTeamVotes ? (
                     <View className='history-vote-detail'>
                       <Text className='history-vote-text'>赞同：{approveVoters.join('、') || '-'}</Text>
                       <Text className='history-vote-text'>反对：{rejectVoters.join('、') || '-'}</Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
               )
             })}
           </View>
         </View>
-      )}
+      ) : null}
 
       <View className='panel'>
         <View className='panel-head'>
