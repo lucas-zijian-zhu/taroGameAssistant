@@ -247,6 +247,42 @@
   margin-top: 24px;
 }
 
+.match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.match-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 116px;
+  min-height: 58px;
+  margin: 0;
+  padding: 12px 10px;
+  border-radius: 8px;
+  color: #176b5c;
+  background: #edf7f4;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.match-button.primary {
+  color: #fff;
+  background: #176b5c;
+}
+
+.match-button.button-disabled {
+  color: #8d98a3;
+  background: #d8d2c8;
+}
+
 .lobby-list {
   display: flex;
   flex-direction: column;
@@ -464,6 +500,12 @@
   gap: 14px;
 }
 
+.round-vote-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .team-chip-list {
   display: flex;
   flex-wrap: wrap;
@@ -484,7 +526,7 @@
 
 .vote-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 64px;
+  grid-template-columns: minmax(0, 1fr) 64px;
   align-items: center;
   gap: 12px;
   box-sizing: border-box;
@@ -493,6 +535,30 @@
   border: 2px solid #e4dacd;
   border-radius: 8px;
   background: #fff;
+}
+
+.large-vote-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 76px;
+  margin: 0;
+  padding: 18px 16px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.large-vote-button.approve {
+  background: #176b5c;
+}
+
+.large-vote-button.reject {
+  background: #8d2d2d;
 }
 
 .vote-actions {
@@ -536,6 +602,11 @@
   padding: 34px 28px;
   border-radius: 8px;
   color: #fff;
+}
+
+.role-card.in-match {
+  width: 100%;
+  margin-top: 18px;
 }
 
 .role-card.good {
@@ -626,10 +697,11 @@
 }
 
 .mission-fail {
-  flex: 0 0 120px;
+  flex: 0 0 auto;
   color: #8d2d2d;
   font-weight: 800;
   text-align: right;
+  white-space: nowrap;
 }
 
 .mission-fail.good {
@@ -646,10 +718,17 @@
 }
 
 .history-main {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
+}
+
+.history-main .mission-fail {
+  justify-self: end;
+  min-width: 128px;
+  box-sizing: border-box;
+  padding: 4px 0;
 }
 
 .history-vote-detail {
@@ -737,20 +816,22 @@ button::after {
     padding-left: 10px;
   }
 
-  .vote-row {
-    grid-template-columns: minmax(0, 1fr) 82px 48px;
-    gap: 8px;
-    min-height: 100px;
-    padding: 12px;
-  }
-
-  .vote-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
   .vote-state {
     font-size: 21px;
+  }
+
+  .history-main {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .history-main .mission-round,
+  .history-main .mission-detail,
+  .history-main .mission-fail {
+    font-size: 23px;
+  }
+
+  .history-main .mission-fail {
+    min-width: 112px;
   }
 }
