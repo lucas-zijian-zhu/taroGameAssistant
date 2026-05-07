@@ -1,6 +1,6 @@
 {
   "name": "taroGameAssistant",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "桌游小助手，提供阿瓦隆，狼人杀等游戏的小程序或者H5的辅助功能",
   "templateInfo": {

@@ -1,5 +1,5 @@
 import { Button, Input, Text, View } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import Taro, { useLoad, useShareAppMessage, useShareTimeline } from '@tarojs/taro'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLobbySocket, useRoomSocket } from '@/api/roomSocket'
 import { getRoomState, listRooms, type RoomsResponse } from '@/api/rooms'
@@ -188,6 +188,26 @@ export default function Index () {
   }, [roomsData?.rooms])
   const typedRoomsError = roomsError as { data?: { message?: string }, message?: string } | null
   const roomsErrorText = typedRoomsError?.data?.message || typedRoomsError?.message || '大厅列表加载失败'
+  const shareTitle = roomCode ? `加入阿瓦隆房间 ${roomCode}` : '阿瓦隆小助手'
+  const sharePath = roomCode ? `/pages/index/index?roomCode=${encodeURIComponent(roomCode)}` : '/pages/index/index'
+
+  useLoad((options) => {
+    const sharedRoomCode = typeof options.roomCode === 'string' ? options.roomCode.trim().toUpperCase() : ''
+
+    if (sharedRoomCode && !roomCode) {
+      setJoinCode(sharedRoomCode)
+    }
+  })
+
+  useShareAppMessage(() => ({
+    title: shareTitle,
+    path: sharePath
+  }))
+
+  useShareTimeline(() => ({
+    title: shareTitle,
+    query: roomCode ? `roomCode=${encodeURIComponent(roomCode)}` : ''
+  }))
 
   const getPlayerName = useCallback((playerId: string) => {
     return players.find((player) => player.id === playerId)?.name || playerId
@@ -874,6 +894,11 @@ export default function Index () {
             {hasGameStarted && currentPlayer ? (
               <Button className='match-button' onClick={() => setActivePlayer(activePlayerId === currentPlayer.id ? '' : currentPlayer.id)}>
                 {activePlayerId === currentPlayer.id ? '隐藏身份' : '查看身份'}
+              </Button>
+            ) : null}
+            {canUseWechatProfile ? (
+              <Button className='match-button' openType='share'>
+                转发
               </Button>
             ) : null}
           </View>
